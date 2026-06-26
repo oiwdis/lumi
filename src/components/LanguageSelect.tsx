@@ -1,0 +1,44 @@
+import { COURSES } from '../data';
+import { useAppStore } from '../store/useAppStore';
+import type { CourseId } from '../types';
+
+export default function LanguageSelect() {
+  const setCourse = useAppStore(s => s.setCourse);
+
+  return (
+    <div className="select-screen">
+      <div className="select-hero">
+        <span className="select-owl">🦉</span>
+        <h1 className="select-title">Lumi</h1>
+        <p className="select-sub">Learn through stories, not flashcards.</p>
+      </div>
+
+      <div className="select-label">Choose your course</div>
+
+      <div className="course-list">
+        {COURSES.map(c => (
+          <button
+            key={c.id}
+            className="course-card"
+            style={{ '--accent': c.color } as React.CSSProperties}
+            onClick={() => setCourse(c.id as CourseId)}
+          >
+            <div className="course-flags">
+              <span>{c.fromFlag}</span>
+              <span className="course-arrow-icon">→</span>
+              <span>{c.toFlag}</span>
+            </div>
+            <div className="course-info">
+              <span className="course-name">{c.fromLang} → {c.toLang}</span>
+              <span className="course-tagline">{c.tagline}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <p className="select-method-note">
+        Based on comprehensible input — the science-backed way to acquire language naturally.
+      </p>
+    </div>
+  );
+}
