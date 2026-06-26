@@ -8,7 +8,7 @@ export default function LanguageSelect() {
   return (
     <div className="select-screen">
       <div className="select-hero">
-        <span className="select-owl">🦉</span>
+        <span className="select-owl">🌱</span>
         <h1 className="select-title">Lumi</h1>
         <p className="select-sub">Learn through stories, not flashcards.</p>
       </div>

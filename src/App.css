@@ -2983,6 +2983,31 @@ input { font-family: inherit; }
 }
 .path-replay-btn:hover { filter: brightness(1.08); transform: translateY(-2px); }
 
+/* Floating AI voice button */
+.voice-fab {
+  position: fixed;
+  bottom: 100px;
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  z-index: 50;
+  transition: all .15s;
+}
+.voice-fab:hover { transform: scale(1.08); border-color: var(--blue); }
+.voice-fab--on {
+  background: var(--blue);
+  border-color: var(--blue);
+  box-shadow: 0 4px 20px rgba(28,176,246,.5);
+}
+
 /* Lesson title badge on mode select */
 .conv-lesson-title-badge {
   display: flex;

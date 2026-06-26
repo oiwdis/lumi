@@ -226,8 +226,9 @@ export default function ConversationScreen() {
     ? topics.find(t => t.id === currentLessonId) ?? null
     : null;
 
-  const [screen, setScreen] = useState<'mode' | 'lesson' | 'results'>('mode');
-  const [mode, setMode] = useState<Mode>('silent');
+  const [screen, setScreen] = useState<'lesson' | 'results'>('lesson');
+  const [mode] = useState<Mode>('silent');
+  const [voiceOn, setVoiceOn] = useState(false);
   const [topic, setTopic] = useState<Topic | null>(null);
   const [ls, setLs] = useState<LessonState | null>(null);
   const [lumiMsg, setLumiMsg] = useState('');
@@ -248,11 +249,18 @@ export default function ConversationScreen() {
   const handleStartLesson = useCallback((t: Topic, m: Mode) => {
     const state = initLesson(t, allWords, langName);
     setTopic(t);
-    setMode(m);
     setLs(initExercise(state));
     setLumiMsg('');
     setScreen('lesson');
   }, [allWords, langName]);
+
+  // Auto-start lesson from the path immediately on mount
+  useEffect(() => {
+    if (currentTopic && !ls) {
+      handleStartLesson(currentTopic, 'silent');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   // ── check answer ─────────────────────────────────────────────────────────────
@@ -283,12 +291,12 @@ export default function ConversationScreen() {
       }).finally(() => setLoadingFeedback(false));
     }
 
-    // Voice: speak the correct answer
-    if (mode === 'voice') {
+    // Speak the correct answer if voice is on
+    if (voiceOn) {
       const answer = ex.kind === 'mc' ? ex.options[ex.correct] : ex.kind === 'type' ? ex.answer : '';
       if (answer) setTimeout(() => speakWord(answer, ttsLang), 400);
     }
-  }, [ls, ex, langName, mode, ttsLang, addXp]);
+  }, [ls, ex, langName, voiceOn, ttsLang, addXp]);
 
   // ── continue to next ─────────────────────────────────────────────────────────
   const handleContinue = useCallback(() => {
@@ -304,14 +312,14 @@ export default function ConversationScreen() {
     if (ls.exercises[ls.idx + 1]?.kind === 'type') {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-    // Voice: speak prompt of next exercise
-    if (mode === 'voice') {
+    // Speak next prompt if voice is on
+    if (voiceOn) {
       const nextEx = ls.exercises[ls.idx + 1];
       if (nextEx?.kind === 'mc' && nextEx.prompt) {
         setTimeout(() => speakWord(nextEx.prompt, ttsLang), 300);
       }
     }
-  }, [ls, isLastExercise, mode, ttsLang]);
+  }, [ls, isLastExercise, voiceOn, ttsLang]);
 
   // ── pairs tap ────────────────────────────────────────────────────────────────
   const handlePairsTap = useCallback((side: 'left' | 'right', value: string) => {
@@ -345,7 +353,7 @@ export default function ConversationScreen() {
         checked: allDone,
         correct: allDone ? true : null,
       } : prev);
-      if (mode === 'voice') speakWord(leftVal, ttsLang);
+      if (voiceOn) speakWord(leftVal, ttsLang);
     } else {
       // Wrong pair — flash red briefly
       setLs(prev => prev ? { ...prev, pairsSelected: null, pairsWrong: leftVal, hearts: Math.max(0, (prev.hearts - 1)) } : prev);
@@ -398,38 +406,13 @@ export default function ConversationScreen() {
   // SCREENS
   // ═════════════════════════════════════════════════════════════════════════════
 
-  // MODE SELECT
-  if (screen === 'mode') return (
+  // Loading state while auto-start kicks in
+  if (screen === 'lesson' && !ls) return (
     <div className="conv-screen">
       <TopBar onBack={goBack} />
       <div className="conv-start-screen">
         <div className="conv-start-avatar"><Avatar avatarId="seedling" color="#7ecf6e" size={72} /></div>
-        {currentTopic && (
-          <div className="conv-lesson-title-badge">
-            <span>{currentTopic.emoji}</span> {currentTopic.title}
-          </div>
-        )}
-        <h2 className="conv-start-title">How do you want to practice?</h2>
-        <div className="conv-mode-cards">
-          <button className="conv-mode-card" onClick={() => {
-            const t = currentTopic;
-            if (t) { handleStartLesson(t, 'voice'); }
-            else { setMode('voice'); }
-          }}>
-            <span className="conv-mode-icon">🎤</span>
-            <span className="conv-mode-label">Voice Mode</span>
-            <span className="conv-mode-sub">Lumi reads words aloud · great for pronunciation</span>
-          </button>
-          <button className="conv-mode-card conv-mode-card--silent" onClick={() => {
-            const t = currentTopic;
-            if (t) { handleStartLesson(t, 'silent'); }
-            else { setMode('silent'); }
-          }}>
-            <span className="conv-mode-icon">📝</span>
-            <span className="conv-mode-label">Silent Mode</span>
-            <span className="conv-mode-sub">No audio · type answers · perfect for public spaces</span>
-          </button>
-        </div>
+        <p className="conv-start-desc">Loading lesson…</p>
       </div>
     </div>
   );
@@ -452,7 +435,7 @@ export default function ConversationScreen() {
           <div className="dl-words-review">
             {topic.words.map((w, i) => (
               <div key={i} className="dl-word-row">
-                {mode === 'voice' && <button className="dl-word-play" onClick={() => speakWord(w.target, ttsLang)}>🔊</button>}
+                {voiceOn && <button className="dl-word-play" onClick={() => speakWord(w.target, ttsLang)}>🔊</button>}
                 <span className="dl-word-target">{w.target}</span>
                 {w.hint && <span className="dl-word-hint">{w.hint}</span>}
                 <span className="dl-word-en">= {w.english}</span>
@@ -479,7 +462,25 @@ export default function ConversationScreen() {
 
     return (
       <div className="conv-screen">
-        <TopBar onBack={() => setScreen('topic')} />
+        <TopBar onBack={completeLesson} />
+
+        {/* Floating AI voice button */}
+        <button
+          className={`voice-fab ${voiceOn ? 'voice-fab--on' : ''}`}
+          onClick={() => {
+            const next = !voiceOn;
+            setVoiceOn(next);
+            if (next && ex.kind !== 'pairs') {
+              const word = (ex as MCExercise | TypeExercise).word;
+              if (word) speakWord(word.target, ttsLang);
+            } else {
+              window.speechSynthesis?.cancel();
+            }
+          }}
+          title={voiceOn ? 'AI Voice ON — tap to mute' : 'AI Voice OFF — tap to hear words'}
+        >
+          {voiceOn ? '🔊' : '🔇'}
+        </button>
 
         {/* Progress + hearts */}
         <div className="dl-lesson-header">
@@ -500,10 +501,10 @@ export default function ConversationScreen() {
           {/* ── MULTIPLE CHOICE ── */}
           {ex.kind === 'mc' && (
             <>
-              <div className="dl-prompt-card" onClick={() => mode === 'voice' && speakWord(ex.prompt, ex.options.includes(ex.options[ex.correct]) && ex.instruction.includes('mean') ? ttsLang : 'en-US')}>
+              <div className="dl-prompt-card" onClick={() => voiceOn && speakWord(ex.prompt, ex.options.includes(ex.options[ex.correct]) && ex.instruction.includes('mean') ? ttsLang : 'en-US')}>
                 <div className="dl-prompt-word">{ex.prompt}</div>
                 {ex.promptSub && <div className="dl-prompt-hint">{ex.promptSub}</div>}
-                {mode === 'voice' && <div className="dl-prompt-speaker">🔊</div>}
+                {voiceOn && <div className="dl-prompt-speaker">🔊</div>}
               </div>
               <div className="dl-options">
                 {ex.options.map((opt, i) => (
@@ -535,12 +536,12 @@ export default function ConversationScreen() {
                   onChange={e => !ls.checked && setLs(prev => prev ? { ...prev, typed: e.target.value } : prev)}
                   onKeyDown={e => e.key === 'Enter' && !ls.checked && ls.typed.trim() && handleCheck()}
                   disabled={ls.checked}
-                  autoFocus={mode === 'silent'}
+                  autoFocus
                 />
                 {ls.checked && !ls.correct && (
                   <div className="dl-correct-answer">Correct answer: <strong>{ex.answer}</strong>{ex.hint ? ` (${ex.hint})` : ''}</div>
                 )}
-                {mode === 'voice' && (
+                {voiceOn && (
                   <button className="dl-hear-btn" onClick={() => speakWord(ex.answer, ttsLang)}>🔊 Hear it</button>
                 )}
               </div>
