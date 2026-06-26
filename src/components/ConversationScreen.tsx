@@ -215,13 +215,18 @@ async function fetchFeedback(
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function ConversationScreen() {
-  const { selectedCourse, user, xp, streak, addXp, goBack, logout } = useAppStore();
+  const { selectedCourse, currentLessonId, user, xp, streak, addXp, goBack, completeLesson, logout } = useAppStore();
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const ttsLang = selectedCourse ? TTS_LANG[selectedCourse] : 'es-ES';
   const langName = selectedCourse ? LANG_NAME[selectedCourse] : 'Spanish';
   const topics = selectedCourse ? (TOPICS[selectedCourse] ?? []) : [];
 
-  const [screen, setScreen] = useState<'mode' | 'topic' | 'lesson' | 'results'>('mode');
+  // Look up the current lesson's topic
+  const currentTopic = currentLessonId
+    ? topics.find(t => t.id === currentLessonId) ?? null
+    : null;
+
+  const [screen, setScreen] = useState<'mode' | 'lesson' | 'results'>('mode');
   const [mode, setMode] = useState<Mode>('silent');
   const [topic, setTopic] = useState<Topic | null>(null);
   const [ls, setLs] = useState<LessonState | null>(null);
@@ -248,6 +253,7 @@ export default function ConversationScreen() {
     setLumiMsg('');
     setScreen('lesson');
   }, [allWords, langName]);
+
 
   // ── check answer ─────────────────────────────────────────────────────────────
   const handleCheck = useCallback(() => {
@@ -398,15 +404,27 @@ export default function ConversationScreen() {
       <TopBar onBack={goBack} />
       <div className="conv-start-screen">
         <div className="conv-start-avatar"><Avatar avatarId="seedling" color="#7ecf6e" size={72} /></div>
-        <h2 className="conv-start-title">Learn with Lumi</h2>
-        <p className="conv-start-desc">Pick how you want to practice:</p>
+        {currentTopic && (
+          <div className="conv-lesson-title-badge">
+            <span>{currentTopic.emoji}</span> {currentTopic.title}
+          </div>
+        )}
+        <h2 className="conv-start-title">How do you want to practice?</h2>
         <div className="conv-mode-cards">
-          <button className="conv-mode-card" onClick={() => { setMode('voice'); setScreen('topic'); }}>
+          <button className="conv-mode-card" onClick={() => {
+            const t = currentTopic;
+            if (t) { handleStartLesson(t, 'voice'); }
+            else { setMode('voice'); }
+          }}>
             <span className="conv-mode-icon">🎤</span>
             <span className="conv-mode-label">Voice Mode</span>
             <span className="conv-mode-sub">Lumi reads words aloud · great for pronunciation</span>
           </button>
-          <button className="conv-mode-card conv-mode-card--silent" onClick={() => { setMode('silent'); setScreen('topic'); }}>
+          <button className="conv-mode-card conv-mode-card--silent" onClick={() => {
+            const t = currentTopic;
+            if (t) { handleStartLesson(t, 'silent'); }
+            else { setMode('silent'); }
+          }}>
             <span className="conv-mode-icon">📝</span>
             <span className="conv-mode-label">Silent Mode</span>
             <span className="conv-mode-sub">No audio · type answers · perfect for public spaces</span>
@@ -416,39 +434,18 @@ export default function ConversationScreen() {
     </div>
   );
 
-  // TOPIC SELECT
-  if (screen === 'topic') return (
-    <div className="conv-screen">
-      <TopBar onBack={() => setScreen('mode')} />
-      <div className="conv-start-screen">
-        <h2 className="conv-start-title">Choose a lesson</h2>
-        <p className="conv-start-desc">{mode === 'voice' ? '🎤 Voice' : '📝 Silent'} · {langName}</p>
-        <div className="topic-grid">
-          {topics.map(t => (
-            <button key={t.id} className="topic-card" onClick={() => handleStartLesson(t, mode)}>
-              <span className="topic-emoji">{t.emoji}</span>
-              <span className="topic-title">{t.title}</span>
-              <span className="topic-count">{t.words.length} words</span>
-            </button>
-          ))}
-        </div>
-        <button className="conv-back-link" onClick={() => setScreen('mode')}>← Change mode</button>
-      </div>
-    </div>
-  );
-
   // RESULTS
   if (screen === 'results' && ls && topic) {
-    const total = ls.exercises.filter(e => e.kind !== 'pairs').length;
-    const pct100 = Math.round((ls.score / total) * 100);
+    const totalEx = ls.exercises.filter(e => e.kind !== 'pairs').length;
+    const pct100 = Math.round((ls.score / totalEx) * 100);
     return (
       <div className="conv-screen">
-        <TopBar onBack={() => setScreen('topic')} />
+        <TopBar onBack={completeLesson} />
         <div className="results-screen dl-results">
           <div className="dl-results-icon">{pct100 === 100 ? '🏆' : pct100 >= 60 ? '⭐' : '💪'}</div>
           <h2 className="dl-results-title">Lesson complete!</h2>
           <div className="dl-results-stats">
-            <div className="dl-stat"><span className="dl-stat-num">{ls.score}/{total}</span><span className="dl-stat-lbl">Score</span></div>
+            <div className="dl-stat"><span className="dl-stat-num">{ls.score}/{totalEx}</span><span className="dl-stat-lbl">Score</span></div>
             <div className="dl-stat"><span className="dl-stat-num">{ls.hearts}❤️</span><span className="dl-stat-lbl">Hearts left</span></div>
             <div className="dl-stat"><span className="dl-stat-num">+{ls.score * 20}</span><span className="dl-stat-lbl">⚡ XP</span></div>
           </div>
@@ -462,8 +459,10 @@ export default function ConversationScreen() {
               </div>
             ))}
           </div>
-          <button className="dl-continue-btn" onClick={() => handleStartLesson(topic, mode)}>Practice again →</button>
-          <button className="conv-back-link" onClick={() => setScreen('topic')}>Choose another lesson</button>
+          <button className="dl-continue-btn" onClick={completeLesson}>
+            {pct100 >= 60 ? 'Continue →' : 'Back to path →'}
+          </button>
+          <button className="conv-back-link" onClick={() => handleStartLesson(topic, mode)}>Practice again</button>
         </div>
       </div>
     );

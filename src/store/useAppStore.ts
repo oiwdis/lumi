@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CourseId } from '../types';
 
-type Screen = 'login' | 'select' | 'chat';
+type Screen = 'login' | 'select' | 'path' | 'chat';
 
 interface AuthUser {
   id: string;
@@ -14,6 +14,8 @@ interface AppStore {
   screen: Screen;
   user: AuthUser | null;
   selectedCourse: CourseId | null;
+  currentLessonId: string | null;
+  completedLessons: Record<string, string[]>; // courseId → lessonId[]
   xp: number;
   streak: number;
   lastSessionDate: string | null;
@@ -21,6 +23,8 @@ interface AppStore {
   login: (user: AuthUser) => void;
   logout: () => void;
   setCourse: (c: CourseId) => void;
+  startLesson: (lessonId: string) => void;
+  completeLesson: () => void;
   goBack: () => void;
   addXp: (amount: number) => void;
   resetProgress: () => void;
@@ -51,6 +55,8 @@ export const useAppStore = create<AppStore>()(
         } catch { return null; }
       })(),
       selectedCourse: null,
+      currentLessonId: null,
+      completedLessons: {},
       xp: 0,
       streak: 0,
       lastSessionDate: null,
@@ -63,12 +69,34 @@ export const useAppStore = create<AppStore>()(
       logout: () => {
         localStorage.removeItem('lumi-token');
         localStorage.removeItem('lumi-user');
-        set({ user: null, screen: 'login', selectedCourse: null });
+        set({ user: null, screen: 'login', selectedCourse: null, currentLessonId: null });
       },
 
-      setCourse: (c) => set({ selectedCourse: c, screen: 'chat' }),
+      setCourse: (c) => set({ selectedCourse: c, screen: 'path' }),
 
-      goBack: () => set({ screen: 'select', selectedCourse: null }),
+      startLesson: (lessonId) => set({ currentLessonId: lessonId, screen: 'chat' }),
+
+      completeLesson: () => {
+        const { selectedCourse, currentLessonId, completedLessons } = get();
+        if (selectedCourse && currentLessonId) {
+          const done = completedLessons[selectedCourse] ?? [];
+          if (!done.includes(currentLessonId)) {
+            set({
+              completedLessons: {
+                ...completedLessons,
+                [selectedCourse]: [...done, currentLessonId],
+              },
+            });
+          }
+        }
+        set({ screen: 'path', currentLessonId: null });
+      },
+
+      goBack: () => {
+        const { screen } = get();
+        if (screen === 'path') set({ screen: 'select', selectedCourse: null });
+        if (screen === 'chat') set({ screen: 'path', currentLessonId: null });
+      },
 
       addXp: (amount) => {
         const { xp, streak, lastSessionDate } = get();
@@ -79,8 +107,8 @@ export const useAppStore = create<AppStore>()(
         set({ xp: xp + amount, streak: newStreak, lastSessionDate: todayStr });
       },
 
-      resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null }),
+      resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {} }),
     }),
-    { name: 'lumi-v1' }
+    { name: 'lumi-v2' }
   )
 );
