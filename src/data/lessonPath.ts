@@ -82,6 +82,45 @@ export const LESSON_UNITS: UnitDef[] = [
       { id: 'time',      title: 'Time',         emoji: '⏰', topicId: 'time',      xpReward: 30 },
     ],
   },
+  {
+    id: 'u6',
+    title: 'Unit 6',
+    subtitle: 'Nature & Sports',
+    color: '#2EC4B6',
+    emoji: '🌿',
+    lessons: [
+      { id: 'nature',  title: 'Nature',   emoji: '🌳', topicId: 'nature',  xpReward: 35 },
+      { id: 'sports',  title: 'Sports',   emoji: '⚽', topicId: 'sports',  xpReward: 35 },
+      { id: 'seasons', title: 'Seasons',  emoji: '🍂', topicId: 'seasons', xpReward: 35 },
+      { id: 'sizes',   title: 'Sizes & Adjectives', emoji: '📏', topicId: 'sizes', xpReward: 35 },
+    ],
+  },
+  {
+    id: 'u7',
+    title: 'Unit 7',
+    subtitle: 'Around Town',
+    color: '#E76F51',
+    emoji: '🏙️',
+    lessons: [
+      { id: 'restaurant',  title: 'Restaurant',  emoji: '🍴', topicId: 'restaurant',  xpReward: 40 },
+      { id: 'shopping',    title: 'Shopping',    emoji: '🛍️', topicId: 'shopping',    xpReward: 40 },
+      { id: 'hotel',       title: 'Hotel',       emoji: '🏨', topicId: 'hotel',       xpReward: 40 },
+      { id: 'directions',  title: 'Directions',  emoji: '🧭', topicId: 'directions',  xpReward: 40 },
+    ],
+  },
+  {
+    id: 'u8',
+    title: 'Unit 8',
+    subtitle: 'Fluency Builder',
+    color: '#9B5DE5',
+    emoji: '🎓',
+    lessons: [
+      { id: 'months',    title: 'Months',          emoji: '📆', topicId: 'months',    xpReward: 45 },
+      { id: 'verbs',     title: 'Action Verbs',    emoji: '🏃', topicId: 'verbs',     xpReward: 45 },
+      { id: 'adjectives',title: 'Adjectives',      emoji: '✨', topicId: 'adjectives',xpReward: 45 },
+      { id: 'phrases2',  title: 'Useful Phrases',  emoji: '💡', topicId: 'phrases2',  xpReward: 45 },
+    ],
+  },
 ];
 
 // Flat list for index-based unlock logic

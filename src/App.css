@@ -3022,3 +3022,28 @@ input { font-family: inherit; }
   color: var(--green);
   margin-bottom: 4px;
 }
+
+/* Quiz header */
+.quiz-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px 6px;
+  flex-shrink: 0;
+}
+.quiz-badge {
+  font-size: 13px;
+  font-weight: 800;
+  color: #FFD900;
+  white-space: nowrap;
+  background: rgba(255,217,0,.12);
+  border: 1px solid rgba(255,217,0,.3);
+  border-radius: 100px;
+  padding: 4px 12px;
+}
+.quiz-counter {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+  white-space: nowrap;
+}

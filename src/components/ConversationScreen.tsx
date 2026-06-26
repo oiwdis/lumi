@@ -165,6 +165,15 @@ function initLesson(topic: Topic, pool: Word[], langName: string): LessonState {
   };
 }
 
+interface QuizState {
+  questions: MCExercise[];
+  idx: number;
+  score: number;
+  selected: number | null;
+  checked: boolean;
+  correct: boolean | null;
+}
+
 function initExercise(ls: LessonState): LessonState {
   const ex = ls.exercises[ls.idx];
   let pairsLeft: string[] = [], pairsRight: string[] = [];
@@ -173,6 +182,22 @@ function initExercise(ls: LessonState): LessonState {
     pairsRight = shuffle(ex.wordPairs.map(w => w.english));
   }
   return { ...ls, selected: null, typed: '', checked: false, correct: null, pairsLeft, pairsRight, pairsSelected: null, pairsMatched: [], pairsWrong: null };
+}
+
+function buildQuiz(topic: Topic, pool: Word[], langName: string): QuizState {
+  const words = topic.words;
+  const questions: MCExercise[] = [];
+  for (const word of shuffle(words)) {
+    const recognize = Math.random() > 0.5;
+    if (recognize) {
+      const opts = shuffle([word.english, ...distractors(word, pool, 'english')]);
+      questions.push({ kind: 'mc', instruction: `What does "${word.target}" mean?`, prompt: word.target, promptSub: word.hint, options: opts, correct: opts.indexOf(word.english), word });
+    } else {
+      const opts = shuffle([word.target, ...distractors(word, pool, 'target')]);
+      questions.push({ kind: 'mc', instruction: `How do you say "${word.english}"?`, prompt: word.english, options: opts, correct: opts.indexOf(word.target), word });
+    }
+  }
+  return { questions, idx: 0, score: 0, selected: null, checked: false, correct: null };
 }
 
 // ── AI feedback ───────────────────────────────────────────────────────────────
@@ -226,7 +251,9 @@ export default function ConversationScreen() {
     ? topics.find(t => t.id === currentLessonId) ?? null
     : null;
 
-  const [screen, setScreen] = useState<'lesson' | 'results'>('lesson');
+  const [screen, setScreen] = useState<'lesson' | 'quiz' | 'results'>('lesson');
+  const [quiz, setQuiz] = useState<QuizState | null>(null);
+  const [quizScore, setQuizScore] = useState(0);
   const [mode] = useState<Mode>('silent');
   const [voiceOn, setVoiceOn] = useState(false);
   const [topic, setTopic] = useState<Topic | null>(null);
@@ -302,7 +329,14 @@ export default function ConversationScreen() {
   const handleContinue = useCallback(() => {
     if (!ls) return;
     if (isLastExercise || ls.hearts === 0) {
-      setScreen('results');
+      if (topic) {
+        const q = buildQuiz(topic, allWords, langName);
+        setQuiz(q);
+        setQuizScore(0);
+        setScreen('quiz');
+      } else {
+        setScreen('results');
+      }
       return;
     }
     const next = initExercise({ ...ls, idx: ls.idx + 1 });
@@ -361,6 +395,26 @@ export default function ConversationScreen() {
     }
   }, [ls, ex, mode, ttsLang, addXp]);
 
+  const handleQuizCheck = useCallback(() => {
+    if (!quiz) return;
+    const q = quiz.questions[quiz.idx];
+    const correct = quiz.selected === q.correct;
+    const newScore = correct ? quiz.score + 1 : quiz.score;
+    addXp(correct ? 15 : 0);
+    setQuiz(prev => prev ? { ...prev, checked: true, correct, score: newScore } : prev);
+  }, [quiz, addXp]);
+
+  const handleQuizContinue = useCallback(() => {
+    if (!quiz) return;
+    const isLast = quiz.idx >= quiz.questions.length - 1;
+    if (isLast) {
+      setQuizScore(quiz.score);
+      setScreen('results');
+      return;
+    }
+    setQuiz(prev => prev ? { ...prev, idx: prev.idx + 1, selected: null, checked: false, correct: null } : prev);
+  }, [quiz]);
+
   // ── keyboard shortcut ─────────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -417,6 +471,72 @@ export default function ConversationScreen() {
     </div>
   );
 
+  // QUIZ
+  if (screen === 'quiz' && quiz && topic) {
+    const qex = quiz.questions[quiz.idx];
+    const qProgress = quiz.idx / quiz.questions.length;
+    const canCheck = !quiz.checked && quiz.selected !== null;
+    const isLastQ = quiz.idx >= quiz.questions.length - 1;
+
+    return (
+      <div className="conv-screen">
+        <TopBar onBack={() => setScreen('results')} />
+
+        {/* Quiz header */}
+        <div className="quiz-header">
+          <span className="quiz-badge">🎯 Quiz Time!</span>
+          <div className="dl-progress-track" style={{ flex: 1 }}>
+            <div className="dl-progress-fill" style={{ width: `${qProgress * 100}%`, background: '#FFD900' }} />
+          </div>
+          <span className="quiz-counter">{quiz.idx + 1}/{quiz.questions.length}</span>
+        </div>
+
+        <div className="dl-exercise-area">
+          <p className="dl-instruction">{qex.instruction}</p>
+          <div className="dl-prompt-card">
+            <div className="dl-prompt-word">{qex.prompt}</div>
+            {qex.promptSub && <div className="dl-prompt-hint">{qex.promptSub}</div>}
+          </div>
+          <div className="dl-options">
+            {qex.options.map((opt, i) => (
+              <button
+                key={i}
+                className={`dl-option ${quiz.selected === i ? 'selected' : ''} ${quiz.checked && i === qex.correct ? 'correct' : ''} ${quiz.checked && quiz.selected === i && i !== qex.correct ? 'wrong' : ''}`}
+                onClick={() => !quiz.checked && setQuiz(prev => prev ? { ...prev, selected: i } : prev)}
+                disabled={quiz.checked}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {quiz.checked && (
+          <div className={`dl-feedback-banner ${quiz.correct ? 'correct' : 'wrong'}`}>
+            <div className="dl-feedback-inner">
+              <Avatar avatarId="seedling" color={quiz.correct ? '#7ecf6e' : '#FF4B4B'} size={36} />
+              <div className="dl-feedback-text">
+                {quiz.correct ? '✓ Correct!' : `✗ The answer is "${qex.options[qex.correct]}"`}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className={`dl-footer ${quiz.checked ? (quiz.correct ? 'correct' : 'wrong') : ''}`}>
+          {quiz.checked ? (
+            <button className="dl-continue-btn" onClick={handleQuizContinue}>
+              {isLastQ ? 'See results →' : 'Next →'}
+            </button>
+          ) : (
+            <button className="dl-check-btn" onClick={handleQuizCheck} disabled={!canCheck}>
+              Check
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // RESULTS
   if (screen === 'results' && ls && topic) {
     const totalEx = ls.exercises.filter(e => e.kind !== 'pairs').length;
@@ -428,9 +548,9 @@ export default function ConversationScreen() {
           <div className="dl-results-icon">{pct100 === 100 ? '🏆' : pct100 >= 60 ? '⭐' : '💪'}</div>
           <h2 className="dl-results-title">Lesson complete!</h2>
           <div className="dl-results-stats">
-            <div className="dl-stat"><span className="dl-stat-num">{ls.score}/{totalEx}</span><span className="dl-stat-lbl">Score</span></div>
-            <div className="dl-stat"><span className="dl-stat-num">{ls.hearts}❤️</span><span className="dl-stat-lbl">Hearts left</span></div>
-            <div className="dl-stat"><span className="dl-stat-num">+{ls.score * 20}</span><span className="dl-stat-lbl">⚡ XP</span></div>
+            <div className="dl-stat"><span className="dl-stat-num">{ls.score}/{totalEx}</span><span className="dl-stat-lbl">Lesson</span></div>
+            <div className="dl-stat"><span className="dl-stat-num">{quizScore}/5</span><span className="dl-stat-lbl">🎯 Quiz</span></div>
+            <div className="dl-stat"><span className="dl-stat-num">{ls.hearts}❤️</span><span className="dl-stat-lbl">Hearts</span></div>
           </div>
           <div className="dl-words-review">
             {topic.words.map((w, i) => (
