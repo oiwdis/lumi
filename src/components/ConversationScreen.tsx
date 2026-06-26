@@ -584,7 +584,7 @@ export default function ConversationScreen() {
 
     return (
       <div className="conv-screen">
-        <TopBar onBack={completeLesson} />
+        <TopBar onBack={goBack} />
 
         {/* Floating AI voice button */}
         <button
