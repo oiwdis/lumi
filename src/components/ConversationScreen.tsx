@@ -486,7 +486,9 @@ export default function ConversationScreen() {
         <div className="quiz-header">
           <span className="quiz-badge">🎯 Quiz Time!</span>
           <div className="dl-progress-track" style={{ flex: 1 }}>
-            <div className="dl-progress-fill" style={{ width: `${qProgress * 100}%`, background: '#FFD900' }} />
+            {Array.from({ length: quiz.questions.length }).map((_, i) => (
+              <div key={i} className={`seg ${i < quiz.idx ? 'filled' : ''}`} style={i < quiz.idx ? { background: 'var(--amber)' } : undefined} />
+            ))}
           </div>
           <span className="quiz-counter">{quiz.idx + 1}/{quiz.questions.length}</span>
         </div>
@@ -550,7 +552,7 @@ export default function ConversationScreen() {
           <div className="dl-results-stats">
             <div className="dl-stat"><span className="dl-stat-num">{ls.score}/{totalEx}</span><span className="dl-stat-lbl">Lesson</span></div>
             <div className="dl-stat"><span className="dl-stat-num">{quizScore}/5</span><span className="dl-stat-lbl">🎯 Quiz</span></div>
-            <div className="dl-stat"><span className="dl-stat-num">{ls.hearts}❤️</span><span className="dl-stat-lbl">Hearts</span></div>
+            <div className="dl-stat"><span className="dl-stat-num">{ls.hearts}⚡</span><span className="dl-stat-lbl">Energy</span></div>
           </div>
           <div className="dl-words-review">
             {topic.words.map((w, i) => (
@@ -602,14 +604,16 @@ export default function ConversationScreen() {
           {voiceOn ? '🔊' : '🔇'}
         </button>
 
-        {/* Progress + hearts */}
+        {/* Progress + energy */}
         <div className="dl-lesson-header">
           <div className="dl-progress-track">
-            <div className="dl-progress-fill" style={{ width: `${progress * 100}%` }} />
+            {Array.from({ length: total }).map((_, i) => (
+              <div key={i} className={`seg ${i < ls.idx ? 'filled' : ''}`} />
+            ))}
           </div>
           <div className="dl-hearts">
             {Array.from({ length: 3 }).map((_, i) => (
-              <span key={i} className={i < ls.hearts ? 'heart-full' : 'heart-empty'}>❤️</span>
+              <span key={i} className={i < ls.hearts ? 'heart-full' : 'heart-empty'}>⚡</span>
             ))}
           </div>
         </div>

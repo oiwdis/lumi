@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { LESSON_UNITS, FLAT_LESSONS } from '../data/lessonPath';
 import { COURSES } from '../data';
@@ -9,9 +8,6 @@ const LANG_NAME: Record<string, string> = {
   'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese',
 };
 
-// Zigzag horizontal offsets for lesson nodes (4-step pattern)
-const ZIGZAG = ['12%', '38%', '62%', '38%'];
-
 export default function LessonPath() {
   const { selectedCourse, completedLessons, xp, streak, startLesson, goBack, logout } = useAppStore();
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
@@ -20,13 +16,8 @@ export default function LessonPath() {
   const level = getLevelForXp(xp);
   const { pct } = xpProgressInLevel(xp);
 
-  // First uncompleted lesson index (in flat list)
   const currentIdx = FLAT_LESSONS.findIndex(l => !done.includes(l.id));
-  const currentLessonId = currentIdx >= 0 ? FLAT_LESSONS[currentIdx].id : null;
 
-  const currentNodeRef = useRef<HTMLButtonElement>(null);
-
-  // Track which flat index each lesson is at
   let flatIdx = 0;
 
   return (
@@ -50,7 +41,7 @@ export default function LessonPath() {
         </div>
       </div>
 
-      {/* Lesson path */}
+      {/* Lesson grid */}
       <div className="path-scroll">
         {LESSON_UNITS.map(unit => {
           const unitStart = flatIdx;
@@ -63,94 +54,52 @@ export default function LessonPath() {
           });
           flatIdx += unit.lessons.length;
 
-          const unitDone = unitLessons.every(l => l.isCompleted);
-          const unitActive = !unitDone && unitLessons.some(l => !l.isLocked);
+          const completedCount = unitLessons.filter(l => l.isCompleted).length;
+          const unitDone = completedCount === unitLessons.length;
 
           return (
             <div key={unit.id} className="path-unit">
-              {/* Unit banner */}
-              <div
-                className="path-unit-banner"
-                style={{ background: unit.color }}
-              >
-                <span className="path-unit-emoji">{unit.emoji}</span>
-                <div className="path-unit-text">
-                  <span className="path-unit-label">{unit.title}</span>
-                  <span className="path-unit-subtitle">{unit.subtitle}</span>
+              {/* Chapter header */}
+              <div className="path-chapter-header" style={{ borderColor: unit.color }}>
+                <div className="path-chapter-left">
+                  <span className="path-chapter-emoji" style={{ background: unit.color }}>{unit.emoji}</span>
+                  <div>
+                    <div className="path-chapter-title">{unit.title} — {unit.subtitle}</div>
+                    <div className="path-chapter-progress">
+                      {completedCount}/{unitLessons.length} lessons
+                      {unitDone && <span className="path-chapter-done"> · Complete ✓</span>}
+                    </div>
+                  </div>
                 </div>
-                {unitDone && <span className="path-unit-check">✓</span>}
               </div>
 
-              {/* Lesson nodes */}
-              <div className="path-nodes">
-                {unitLessons.map(({ lesson, fi, isCompleted, isCurrent, isLocked }, i) => {
-                  const offset = ZIGZAG[i % ZIGZAG.length];
-                  return (
-                    <div
-                      key={lesson.id}
-                      className="path-node-row"
-                      style={{ paddingLeft: offset }}
-                    >
-                      {isCurrent ? (
-                        <div className="path-node-wrapper">
-                          <div className="path-node-label">{lesson.title}</div>
-                          <button
-                            ref={currentNodeRef}
-                            className="path-node path-node--current"
-                            style={{ borderBottomColor: unit.color, background: unit.color }}
-                            onClick={() => startLesson(lesson.id)}
-                            title={lesson.title}
-                          >
-                            <span className="path-node-emoji">{lesson.emoji}</span>
-                          </button>
-                          <div
-                            className="path-node-start-badge"
-                            style={{ background: unit.color }}
-                            onClick={() => startLesson(lesson.id)}
-                          >
-                            START
-                          </div>
-                        </div>
-                      ) : isCompleted ? (
-                        <div className="path-node-wrapper">
-                          <button
-                            className="path-node path-node--done"
-                            style={{ borderBottomColor: '#58A700', background: '#58CC02' }}
-                            onClick={() => startLesson(lesson.id)}
-                            title={`${lesson.title} — Practice again`}
-                          >
-                            <span className="path-node-check">✓</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="path-node-wrapper">
-                          <button
-                            className="path-node path-node--locked"
-                            disabled
-                            title={`${lesson.title} — Complete previous lessons to unlock`}
-                          >
-                            🔒
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              {/* 2-column card grid */}
+              <div className="path-card-grid">
+                {unitLessons.map(({ lesson, isCompleted, isCurrent, isLocked }) => (
+                  <button
+                    key={lesson.id}
+                    className={`path-card ${isCompleted ? 'path-card--done' : ''} ${isCurrent ? 'path-card--current' : ''} ${isLocked ? 'path-card--locked' : ''}`}
+                    onClick={() => !isLocked && startLesson(lesson.id)}
+                    disabled={isLocked}
+                    style={isCurrent ? { '--card-accent': unit.color } as React.CSSProperties : undefined}
+                  >
+                    <span className="path-card-emoji">{isLocked ? '🔒' : lesson.emoji}</span>
+                    <span className="path-card-title">{lesson.title}</span>
+                    {isCompleted && <span className="path-card-check">✓</span>}
+                    {isCurrent && <span className="path-card-play">▶</span>}
+                  </button>
+                ))}
               </div>
             </div>
           );
         })}
 
-        {/* All done message */}
-        {currentLessonId === null && (
+        {currentIdx === -1 && (
           <div className="path-complete">
             <div className="path-complete-icon">🏆</div>
-            <h2>You've completed all lessons!</h2>
-            <p>Keep practicing to master {langName}.</p>
-            <button
-              className="path-replay-btn"
-              onClick={() => startLesson(FLAT_LESSONS[0].id)}
-            >
+            <h2>Course complete!</h2>
+            <p>You've mastered all {FLAT_LESSONS.length} lessons in {langName}.</p>
+            <button className="path-replay-btn" onClick={() => startLesson(FLAT_LESSONS[0].id)}>
               Start over →
             </button>
           </div>
