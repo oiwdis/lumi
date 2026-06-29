@@ -37,7 +37,7 @@ export default function LessonPath() {
             </div>
           </div>
           <span className="path-streak">🔥{streak}</span>
-          <button className="path-logout-btn" onClick={logout}>⏏</button>
+          <button className="path-logout-btn" onClick={logout}>Logout</button>
         </div>
       </div>
 

@@ -34,6 +34,7 @@ export default function LoginScreen({ onAuth }: Props) {
     setError('');
     if (!email || !password) { setError('Please fill in all fields'); return; }
     if (mode === 'signup' && !name) { setError('Please enter your name'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('Please enter a valid email address'); return; }
 
     setLoading(true);
     try {

@@ -451,7 +451,7 @@ export default function ConversationScreen() {
           </div>
         )}
         <span className="conv-streak">🔥{streak}</span>
-        <button className="conv-logout-btn" onClick={() => { window.speechSynthesis?.cancel(); logout(); }}>⏏</button>
+        <button className="conv-logout-btn" onClick={() => { window.speechSynthesis?.cancel(); logout(); }}>Logout</button>
       </div>
     </div>
   );

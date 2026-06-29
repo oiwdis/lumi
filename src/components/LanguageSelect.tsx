@@ -4,9 +4,13 @@ import type { CourseId } from '../types';
 
 export default function LanguageSelect() {
   const setCourse = useAppStore(s => s.setCourse);
+  const logout = useAppStore(s => s.logout);
 
   return (
     <div className="select-screen">
+      <div className="select-topbar">
+        <button className="select-logout-btn" onClick={logout}>Logout</button>
+      </div>
       <div className="select-hero">
         <span className="select-owl">🌱</span>
         <h1 className="select-title">Lumi</h1>

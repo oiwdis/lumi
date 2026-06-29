@@ -2,6 +2,24 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CourseId } from '../types';
 
+interface UserProgress {
+  completedLessons: Record<string, string[]>;
+  xp: number;
+  streak: number;
+  lastSessionDate: string | null;
+}
+
+function loadProgress(userId: string): UserProgress {
+  try {
+    const saved = localStorage.getItem(`lumi-progress-${userId}`);
+    return saved ? JSON.parse(saved) : { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null };
+  } catch { return { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null }; }
+}
+
+function saveProgress(userId: string, p: UserProgress) {
+  localStorage.setItem(`lumi-progress-${userId}`, JSON.stringify(p));
+}
+
 type Screen = 'login' | 'select' | 'path' | 'chat';
 
 interface AuthUser {
@@ -62,14 +80,17 @@ export const useAppStore = create<AppStore>()(
       lastSessionDate: null,
 
       login: (user) => {
+        const progress = loadProgress(user.id);
         localStorage.setItem('lumi-user', JSON.stringify(user));
-        set({ user, screen: 'select' });
+        set({ user, screen: 'select', ...progress });
       },
 
       logout: () => {
+        const { user, completedLessons, xp, streak, lastSessionDate } = get();
+        if (user) saveProgress(user.id, { completedLessons, xp, streak, lastSessionDate });
         localStorage.removeItem('lumi-token');
         localStorage.removeItem('lumi-user');
-        set({ user: null, screen: 'login', selectedCourse: null, currentLessonId: null });
+        set({ user: null, screen: 'login', selectedCourse: null, currentLessonId: null, completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null });
       },
 
       setCourse: (c) => set({ selectedCourse: c, screen: 'path' }),
@@ -77,18 +98,16 @@ export const useAppStore = create<AppStore>()(
       startLesson: (lessonId) => set({ currentLessonId: lessonId, screen: 'chat' }),
 
       completeLesson: () => {
-        const { selectedCourse, currentLessonId, completedLessons } = get();
+        const { user, selectedCourse, currentLessonId, completedLessons, xp, streak, lastSessionDate } = get();
+        let newCompletedLessons = completedLessons;
         if (selectedCourse && currentLessonId) {
           const done = completedLessons[selectedCourse] ?? [];
           if (!done.includes(currentLessonId)) {
-            set({
-              completedLessons: {
-                ...completedLessons,
-                [selectedCourse]: [...done, currentLessonId],
-              },
-            });
+            newCompletedLessons = { ...completedLessons, [selectedCourse]: [...done, currentLessonId] };
+            set({ completedLessons: newCompletedLessons });
           }
         }
+        if (user) saveProgress(user.id, { completedLessons: newCompletedLessons, xp, streak, lastSessionDate });
         set({ screen: 'path', currentLessonId: null });
       },
 
@@ -99,12 +118,14 @@ export const useAppStore = create<AppStore>()(
       },
 
       addXp: (amount) => {
-        const { xp, streak, lastSessionDate } = get();
+        const { user, xp, streak, lastSessionDate, completedLessons } = get();
         const todayStr = today();
         const newStreak = lastSessionDate === yesterday() ? streak + 1
           : lastSessionDate === todayStr ? streak
           : 1;
-        set({ xp: xp + amount, streak: newStreak, lastSessionDate: todayStr });
+        const newXp = xp + amount;
+        set({ xp: newXp, streak: newStreak, lastSessionDate: todayStr });
+        if (user) saveProgress(user.id, { completedLessons, xp: newXp, streak: newStreak, lastSessionDate: todayStr });
       },
 
       resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {} }),
