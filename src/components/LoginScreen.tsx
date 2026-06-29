@@ -10,6 +10,18 @@ interface Props {
   onAuth: (user: User) => void;
 }
 
+// Simple client-side credential store — survives deploys since it's in localStorage
+function getAccounts(): Record<string, { user: User; passwordHash: string }> {
+  try { return JSON.parse(localStorage.getItem('lumi-accounts') ?? '{}'); } catch { return {}; }
+}
+function saveAccounts(accounts: Record<string, { user: User; passwordHash: string }>) {
+  localStorage.setItem('lumi-accounts', JSON.stringify(accounts));
+}
+async function hashPassword(password: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password + 'lumi-salt'));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export default function LoginScreen({ onAuth }: Props) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [name, setName] = useState('');
@@ -25,32 +37,26 @@ export default function LoginScreen({ onAuth }: Props) {
 
     setLoading(true);
     try {
-      const body = mode === 'signup'
-        ? { name, email, password }
-        : { email, password };
+      const ph = await hashPassword(password);
+      const accounts = getAccounts();
 
-      const res = await fetch(`/api/auth/${mode}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? 'Something went wrong'); return; }
-
-      localStorage.setItem('lumi-token', data.token);
-      localStorage.setItem('lumi-user', JSON.stringify(data.user));
-      onAuth(data.user);
-    } catch {
-      setError('Could not connect to server');
+      if (mode === 'signup') {
+        if (accounts[email]) { setError('Email already registered'); return; }
+        const user: User = { id: crypto.randomUUID(), name, email };
+        accounts[email] = { user, passwordHash: ph };
+        saveAccounts(accounts);
+        onAuth(user);
+      } else {
+        const entry = accounts[email];
+        if (!entry || entry.passwordHash !== ph) { setError('Invalid email or password'); return; }
+        onAuth(entry.user);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') submit();
-  };
+  const handleKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter') submit(); };
 
   return (
     <div className="login-screen">
@@ -109,11 +115,7 @@ export default function LoginScreen({ onAuth }: Props) {
 
         {error && <p className="login-error">{error}</p>}
 
-        <button
-          className="login-submit"
-          onClick={submit}
-          disabled={loading}
-        >
+        <button className="login-submit" onClick={submit} disabled={loading}>
           {loading ? '…' : mode === 'login' ? 'Log in' : 'Create account'}
         </button>
       </div>
