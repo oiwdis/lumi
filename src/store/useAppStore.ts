@@ -179,17 +179,11 @@ export const useAppStore = create<AppStore>()(
       addToInventory: (items) => {
         const s = get();
         const newInv = { ...s.inventory };
-        let bonusCoins = 0;
         for (const item of items) {
-          if (item.type === 'coins' && item.value) {
-            bonusCoins += item.value;
-          } else {
-            newInv[item.id] = (newInv[item.id] ?? 0) + 1;
-          }
+          newInv[item.id] = (newInv[item.id] ?? 0) + 1;
         }
-        const newCoins = s.coins + bonusCoins;
-        set({ inventory: newInv, coins: newCoins });
-        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), inventory: newInv, coins: newCoins });
+        set({ inventory: newInv });
+        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), inventory: newInv });
       },
 
       sellItem: (itemId, rarity) => {
