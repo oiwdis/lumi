@@ -49,7 +49,8 @@ export default function LessonPath() {
             const fi = unitStart + lessonIdx;
             const isCompleted = done.includes(lesson.id);
             const isCurrent = fi === currentIdx;
-            const isLocked = !isCompleted && fi > currentIdx;
+            const isFirstInUnit = lessonIdx === 0;
+            const isLocked = !isCompleted && fi > currentIdx && !isFirstInUnit;
             return { lesson, fi, isCompleted, isCurrent, isLocked };
           });
           flatIdx += unit.lessons.length;
