@@ -518,7 +518,20 @@ export default function ConversationScreen() {
   );
 
   // QUIZ
-  if (screen === 'quiz' && quiz && topic) {
+  if (screen === 'quiz') {
+    if (!quiz || !topic) {
+      // State not ready yet — snap to results rather than going blank
+      return (
+        <div className="conv-screen">
+          <TopBar onBack={completeLesson} />
+          <div className="dl-results" style={{ flex: 1 }}>
+            <div className="dl-results-icon">⭐</div>
+            <h2 className="dl-results-title">Lesson complete!</h2>
+            <button className="dl-continue-btn" onClick={completeLesson} style={{ marginTop: 24 }}>Continue →</button>
+          </div>
+        </div>
+      );
+    }
     const qex = quiz.questions[quiz.idx];
     const qProgress = quiz.idx / quiz.questions.length;
     const canCheck = !quiz.checked && quiz.selected !== null;
@@ -763,5 +776,15 @@ export default function ConversationScreen() {
     );
   }
 
-  return null;
+  // Catch-all — should never reach here, but prevents blank screen
+  return (
+    <div className="conv-screen">
+      <TopBar onBack={goBack} />
+      <div className="dl-results" style={{ flex: 1 }}>
+        <div className="dl-results-icon">🌱</div>
+        <h2 className="dl-results-title">Something went wrong</h2>
+        <button className="dl-continue-btn" onClick={goBack} style={{ marginTop: 24 }}>← Back to lessons</button>
+      </div>
+    </div>
+  );
 }
