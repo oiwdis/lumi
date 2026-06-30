@@ -24,8 +24,10 @@ export default function AIChat({
 }: Props) {
   const [input, setInput] = useState('');
   const [listening, setListening] = useState(false);
+  const [listenStatus, setListenStatus] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const resultFiredRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -46,23 +48,59 @@ export default function AIChat({
     if (listening) {
       recognitionRef.current?.stop();
       setListening(false);
+      setListenStatus('');
       return;
     }
+
     const rec = new SR();
-    rec.lang = ttsLang;
+    // Use browser default language so any attempt is captured,
+    // then Claude judges how close it was to the target word.
     rec.interimResults = false;
-    rec.maxAlternatives = 3;
+    rec.maxAlternatives = 5;
+    resultFiredRef.current = false;
+
+    rec.onstart = () => setListenStatus('Listening…');
+
     rec.onresult = (e: any) => {
-      // try all alternatives for best match
-      const transcript = e.results[0][0].transcript;
+      resultFiredRef.current = true;
+      // pick the alternative with highest confidence
+      const best = Array.from(e.results[0] as any[])
+        .sort((a: any, b: any) => b.confidence - a.confidence)[0];
+      const transcript = best?.transcript ?? e.results[0][0].transcript;
       setListening(false);
+      setListenStatus('');
       onSend(transcript, true);
     };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
-    recognitionRef.current = rec;
-    rec.start();
-    setListening(true);
+
+    rec.onnomatch = () => {
+      resultFiredRef.current = true;
+      setListening(false);
+      setListenStatus('');
+      onSend('__mic_nomatch__', false);
+    };
+
+    rec.onerror = (e: any) => {
+      resultFiredRef.current = true;
+      setListening(false);
+      setListenStatus('');
+      onSend('__mic_error__:' + (e.error ?? 'unknown'), false);
+    };
+
+    rec.onend = () => {
+      setListening(false);
+      setListenStatus('');
+      if (!resultFiredRef.current) {
+        onSend('__mic_nomatch__', false);
+      }
+    };
+
+    try {
+      recognitionRef.current = rec;
+      rec.start();
+      setListening(true);
+    } catch {
+      onSend('__mic_error__:start-failed', false);
+    }
   };
 
   return (
@@ -120,10 +158,11 @@ export default function AIChat({
             </button>
             <input
               className="chat-input"
-              placeholder={currentWord ? `Ask about "${currentWord.english}"…` : `Ask Lumi in ${langName}…`}
+              placeholder={listenStatus || (currentWord ? `Ask about "${currentWord.english}"…` : `Ask Lumi anything…`)}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
+              disabled={listening}
             />
             <button className="chat-send-btn" onClick={handleSend} disabled={!input.trim()}>↑</button>
           </div>

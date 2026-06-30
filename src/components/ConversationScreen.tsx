@@ -405,9 +405,26 @@ export default function ConversationScreen() {
 
   // ── chat send (text or pronunciation) ────────────────────────────────────────
   const handleChatSend = useCallback(async (text: string, isPronunciation: boolean) => {
-    if (text === '__no_speech_api__') {
+    const addAiMsg = (msg: string) => {
       const id = String(++chatMsgIdRef.current);
-      setChatMessages(prev => [...prev, { id, role: 'ai', text: 'Speech recognition is not supported in this browser. Try Chrome or Edge.' }]);
+      setChatMessages(prev => [...prev, { id, role: 'ai', text: msg }]);
+    };
+
+    if (text === '__no_speech_api__') {
+      addAiMsg('Speech recognition isn\'t available in this browser. Try Chrome or Edge on desktop.');
+      return;
+    }
+    if (text === '__mic_nomatch__') {
+      addAiMsg('I couldn\'t hear anything. Make sure your microphone is allowed, then tap 🎤 and speak clearly.');
+      return;
+    }
+    if (text.startsWith('__mic_error__:')) {
+      const code = text.split(':')[1];
+      if (code === 'not-allowed') {
+        addAiMsg('Microphone access was blocked. Allow microphone permission in your browser settings and try again.');
+      } else {
+        addAiMsg(`Microphone error (${code}). Check that your mic is connected and permitted, then try again.`);
+      }
       return;
     }
 
@@ -423,10 +440,10 @@ export default function ConversationScreen() {
     let systemPrompt: string;
 
     if (isPronunciation && currentWord) {
-      prompt = `The student tried to say "${currentWord.target}" (${currentWord.english}) in ${langName}. Speech recognition heard: "${text}". Was their pronunciation correct? Give a brief verdict and one tip if needed.`;
-      systemPrompt = `You are Lumi, a ${langName} pronunciation coach. Be encouraging. Max 2 sentences. No markdown.`;
+      prompt = `A student is learning ${langName}. They were trying to say the word "${currentWord.target}" (meaning "${currentWord.english}"). Speech recognition (using the browser's default language) transcribed their attempt as: "${text}". This transcript is a phonetic approximation — judge whether it sounds close to the correct ${langName} pronunciation. Give a clear verdict (correct / close / needs work) and one short tip. Be encouraging.`;
+      systemPrompt = `You are Lumi, a ${langName} pronunciation coach. Max 2 sentences. No markdown. Be warm and specific.`;
     } else if (isPronunciation) {
-      prompt = `The student said: "${text}" in ${langName}. Comment on this in the context of the lesson.`;
+      prompt = `A student learning ${langName} spoke and speech recognition heard: "${text}". Respond helpfully in the context of their ${langName} lesson.`;
       systemPrompt = `You are Lumi, a friendly ${langName} tutor. Max 2 sentences. No markdown.`;
     } else {
       prompt = text;
