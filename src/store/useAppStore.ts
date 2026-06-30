@@ -24,7 +24,7 @@ function saveProgress(userId: string, p: UserProgress) {
   localStorage.setItem(`lumi-progress-${userId}`, JSON.stringify(p));
 }
 
-type Screen = 'login' | 'select' | 'path' | 'chat' | 'shop';
+type Screen = 'login' | 'select' | 'path' | 'chat' | 'shop' | 'profile';
 
 interface AuthUser { id: string; name: string; email: string; }
 
@@ -51,6 +51,7 @@ interface AppStore {
   spendCoins: (amount: number) => boolean;
   addToInventory: (items: ShopItem[]) => void;
   openShop: () => void;
+  openProfile: () => void;
   resetProgress: () => void;
 }
 
@@ -103,6 +104,7 @@ export const useAppStore = create<AppStore>()(
       setCourse: (c) => set({ selectedCourse: c, screen: 'path' }),
       startLesson: (lessonId) => set({ currentLessonId: lessonId, screen: 'chat' }),
       openShop: () => set({ screen: 'shop' }),
+      openProfile: () => set({ screen: 'profile' }),
 
       completeLesson: () => {
         const s = get();
@@ -125,6 +127,7 @@ export const useAppStore = create<AppStore>()(
         if (screen === 'path') set({ screen: 'select', selectedCourse: null });
         if (screen === 'chat') set({ screen: 'path', currentLessonId: null });
         if (screen === 'shop') set({ screen: 'path' });
+        if (screen === 'profile') set({ screen: 'path' });
       },
 
       addXp: (amount) => {

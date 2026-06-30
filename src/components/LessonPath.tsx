@@ -9,7 +9,7 @@ const LANG_NAME: Record<string, string> = {
 };
 
 export default function LessonPath() {
-  const { selectedCourse, completedLessons, xp, streak, coins, startLesson, goBack, logout, openShop } = useAppStore();
+  const { selectedCourse, completedLessons, xp, streak, coins, startLesson, goBack, logout, openShop, openProfile } = useAppStore();
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const langName = selectedCourse ? (LANG_NAME[selectedCourse] ?? 'Unknown') : '';
   const done = selectedCourse ? (completedLessons[selectedCourse] ?? []) : [];
@@ -38,6 +38,9 @@ export default function LessonPath() {
           </div>
           <span className="path-streak">🔥{streak}</span>
           <button className="path-shop-btn" onClick={openShop} title="Shop">🪙{coins}</button>
+          <button className="path-profile-btn" onClick={openProfile} title="Profile">
+            <Avatar avatarId={level.avatarId} color={level.color} size={28} />
+          </button>
           <button className="path-logout-btn" onClick={logout}>Logout</button>
         </div>
       </div>
