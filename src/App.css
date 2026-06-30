@@ -2956,8 +2956,8 @@ input { font-family: inherit; }
   position: fixed;
   bottom: 158px;
   right: 16px;
-  width: 300px;
-  max-height: 400px;
+  width: 360px;
+  max-height: 520px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 20px;
