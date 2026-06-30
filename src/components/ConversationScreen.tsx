@@ -4,6 +4,7 @@ import { COURSES } from '../data';
 import { TOPICS, type Topic, type Word } from '../data/lessonWords';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
 import Avatar from './Avatar';
+import AIChat, { type ChatMessage } from './AIChat';
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -200,24 +201,17 @@ function buildQuiz(topic: Topic, pool: Word[], langName: string): QuizState {
   return { questions, idx: 0, score: 0, selected: null, checked: false, correct: null };
 }
 
-// ── AI feedback ───────────────────────────────────────────────────────────────
+// ── AI streaming helper ───────────────────────────────────────────────────────
 
-async function fetchFeedback(
-  langName: string, word: Word, wasCorrect: boolean,
+async function fetchAIResponse(
+  prompt: string, systemPrompt: string,
   onChunk: (t: string) => void
 ): Promise<void> {
-  const prompt = wasCorrect
-    ? `The student correctly answered "${word.target}" (${word.english}) in their ${langName} lesson. Give ONE short encouraging sentence (max 12 words). No markdown. Be enthusiastic.`
-    : `The student got "${word.target}" (${word.english}) wrong in their ${langName} lesson. Give ONE short helpful tip or encouragement (max 15 words). No markdown. Be kind.`;
-
   try {
     const res = await fetch('/api/tutor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }],
-        systemPrompt: `You are Lumi, an encouraging ${langName} teacher. Give very short, punchy responses. No markdown.`,
-      }),
+      body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], systemPrompt }),
     });
     if (!res.ok) return;
     const reader = res.body!.getReader();
@@ -232,7 +226,7 @@ async function fetchFeedback(
         try { const { text } = JSON.parse(raw); if (text) onChunk(text); } catch { /* skip */ }
       }
     }
-  } catch { /* ignore — feedback is optional */ }
+  } catch { /* ignore — AI feedback is optional */ }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -255,11 +249,15 @@ export default function ConversationScreen() {
   const [quiz, setQuiz] = useState<QuizState | null>(null);
   const [quizScore, setQuizScore] = useState(0);
   const [mode] = useState<Mode>('silent');
-  const [voiceOn, setVoiceOn] = useState(false);
   const [topic, setTopic] = useState<Topic | null>(null);
   const [ls, setLs] = useState<LessonState | null>(null);
-  const [lumiMsg, setLumiMsg] = useState('');
-  const [loadingFeedback, setLoadingFeedback] = useState(false);
+
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatUnread, setChatUnread] = useState(false);
+  const chatMsgIdRef = useRef(0);
 
   const level = getLevelForXp(xp);
   const { pct } = xpProgressInLevel(xp);
@@ -277,7 +275,7 @@ export default function ConversationScreen() {
     const state = initLesson(t, allWords, langName);
     setTopic(t);
     setLs(initExercise(state));
-    setLumiMsg('');
+    setChatMessages([]);
     setScreen('lesson');
   }, [allWords, langName]);
 
@@ -306,24 +304,24 @@ export default function ConversationScreen() {
     setLs(prev => prev ? { ...prev, checked: true, correct, hearts: newHearts, score: newScore } : prev);
     addXp(correct ? 20 : 5);
 
-    // Get AI feedback (non-blocking)
+    // Push AI feedback into chat
     const word = (ex as MCExercise | TypeExercise).word;
     if (word) {
-      setLumiMsg('');
-      setLoadingFeedback(true);
-      let text = '';
-      fetchFeedback(langName, word, correct, chunk => {
-        text += chunk;
-        setLumiMsg(text);
-      }).finally(() => setLoadingFeedback(false));
+      const prompt = correct
+        ? `Student correctly answered "${word.target}" (${word.english}) in ${langName}. Give ONE short encouraging sentence (max 12 words). No markdown.`
+        : `Student got "${word.target}" (${word.english}) wrong in ${langName}. Give ONE helpful tip (max 15 words). No markdown. Be kind.`;
+      const systemPrompt = `You are Lumi, an encouraging ${langName} tutor. Very short, punchy responses. No markdown.`;
+      const msgId = String(++chatMsgIdRef.current);
+      setChatMessages(prev => [...prev, { id: msgId, role: 'ai', text: '' }]);
+      setChatLoading(true);
+      if (!chatOpen) setChatUnread(true);
+      let accumulated = '';
+      fetchAIResponse(prompt, systemPrompt, chunk => {
+        accumulated += chunk;
+        setChatMessages(prev => prev.map(m => m.id === msgId ? { ...m, text: accumulated } : m));
+      }).finally(() => setChatLoading(false));
     }
-
-    // Speak the correct answer if voice is on
-    if (voiceOn) {
-      const answer = ex.kind === 'mc' ? ex.options[ex.correct] : ex.kind === 'type' ? ex.answer : '';
-      if (answer) setTimeout(() => speakWord(answer, ttsLang), 400);
-    }
-  }, [ls, ex, langName, voiceOn, ttsLang, addXp]);
+  }, [ls, ex, langName, chatOpen, addXp]);
 
   // ── continue to next ─────────────────────────────────────────────────────────
   const handleContinue = useCallback(() => {
@@ -341,19 +339,11 @@ export default function ConversationScreen() {
     }
     const next = initExercise({ ...ls, idx: ls.idx + 1 });
     setLs(next);
-    setLumiMsg('');
     // Auto-focus input for type exercises
     if (ls.exercises[ls.idx + 1]?.kind === 'type') {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-    // Speak next prompt if voice is on
-    if (voiceOn) {
-      const nextEx = ls.exercises[ls.idx + 1];
-      if (nextEx?.kind === 'mc' && nextEx.prompt) {
-        setTimeout(() => speakWord(nextEx.prompt, ttsLang), 300);
-      }
-    }
-  }, [ls, isLastExercise, voiceOn, ttsLang]);
+  }, [ls, isLastExercise, topic, allWords, langName]);
 
   // ── pairs tap ────────────────────────────────────────────────────────────────
   const handlePairsTap = useCallback((side: 'left' | 'right', value: string) => {
@@ -387,13 +377,11 @@ export default function ConversationScreen() {
         checked: allDone,
         correct: allDone ? true : null,
       } : prev);
-      if (voiceOn) speakWord(leftVal, ttsLang);
     } else {
-      // Wrong pair — flash red briefly
       setLs(prev => prev ? { ...prev, pairsSelected: null, pairsWrong: leftVal, hearts: Math.max(0, (prev.hearts - 1)) } : prev);
       setTimeout(() => setLs(prev => prev ? { ...prev, pairsWrong: null } : prev), 600);
     }
-  }, [ls, ex, mode, ttsLang, addXp]);
+  }, [ls, ex, addXp]);
 
   const handleQuizCheck = useCallback(() => {
     if (!quiz) return;
@@ -414,6 +402,47 @@ export default function ConversationScreen() {
     }
     setQuiz(prev => prev ? { ...prev, idx: prev.idx + 1, selected: null, checked: false, correct: null } : prev);
   }, [quiz]);
+
+  // ── chat send (text or pronunciation) ────────────────────────────────────────
+  const handleChatSend = useCallback(async (text: string, isPronunciation: boolean) => {
+    if (text === '__no_speech_api__') {
+      const id = String(++chatMsgIdRef.current);
+      setChatMessages(prev => [...prev, { id, role: 'ai', text: 'Speech recognition is not supported in this browser. Try Chrome or Edge.' }]);
+      return;
+    }
+
+    const userMsgId = String(++chatMsgIdRef.current);
+    const displayText = isPronunciation ? `🎤 "${text}"` : text;
+    setChatMessages(prev => [...prev, { id: userMsgId, role: 'user', text: displayText }]);
+
+    const currentWord = ex && ex.kind !== 'pairs'
+      ? { target: (ex as MCExercise | TypeExercise).word.target, english: (ex as MCExercise | TypeExercise).word.english }
+      : undefined;
+
+    let prompt: string;
+    let systemPrompt: string;
+
+    if (isPronunciation && currentWord) {
+      prompt = `The student tried to say "${currentWord.target}" (${currentWord.english}) in ${langName}. Speech recognition heard: "${text}". Was their pronunciation correct? Give a brief verdict and one tip if needed.`;
+      systemPrompt = `You are Lumi, a ${langName} pronunciation coach. Be encouraging. Max 2 sentences. No markdown.`;
+    } else if (isPronunciation) {
+      prompt = `The student said: "${text}" in ${langName}. Comment on this in the context of the lesson.`;
+      systemPrompt = `You are Lumi, a friendly ${langName} tutor. Max 2 sentences. No markdown.`;
+    } else {
+      prompt = text;
+      systemPrompt = `You are Lumi, a friendly ${langName} tutor. Answer concisely (2-3 sentences max). No markdown. If asked about a word or phrase, give the ${langName} translation and a usage tip.`;
+    }
+
+    const aiMsgId = String(++chatMsgIdRef.current);
+    setChatMessages(prev => [...prev, { id: aiMsgId, role: 'ai', text: '' }]);
+    setChatLoading(true);
+    let accumulated = '';
+    await fetchAIResponse(prompt, systemPrompt, chunk => {
+      accumulated += chunk;
+      setChatMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulated } : m));
+    });
+    setChatLoading(false);
+  }, [ex, langName]);
 
   // ── keyboard shortcut ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -586,24 +615,6 @@ export default function ConversationScreen() {
       <div className="conv-screen">
         <TopBar onBack={goBack} />
 
-        {/* Floating AI voice button */}
-        <button
-          className={`voice-fab ${voiceOn ? 'voice-fab--on' : ''}`}
-          onClick={() => {
-            const next = !voiceOn;
-            setVoiceOn(next);
-            if (next && ex.kind !== 'pairs') {
-              const word = (ex as MCExercise | TypeExercise).word;
-              if (word) speakWord(word.target, ttsLang);
-            } else {
-              window.speechSynthesis?.cancel();
-            }
-          }}
-          title={voiceOn ? 'AI Voice ON — tap to mute' : 'AI Voice OFF — tap to hear words'}
-        >
-          {voiceOn ? '🔊' : '🔇'}
-        </button>
-
         {/* Progress + energy */}
         <div className="dl-lesson-header">
           <div className="dl-progress-track">
@@ -625,10 +636,9 @@ export default function ConversationScreen() {
           {/* ── MULTIPLE CHOICE ── */}
           {ex.kind === 'mc' && (
             <>
-              <div className="dl-prompt-card" onClick={() => voiceOn && speakWord(ex.prompt, ex.options.includes(ex.options[ex.correct]) && ex.instruction.includes('mean') ? ttsLang : 'en-US')}>
+              <div className="dl-prompt-card">
                 <div className="dl-prompt-word">{ex.prompt}</div>
                 {ex.promptSub && <div className="dl-prompt-hint">{ex.promptSub}</div>}
-                {voiceOn && <div className="dl-prompt-speaker">🔊</div>}
               </div>
               <div className="dl-options">
                 {ex.options.map((opt, i) => (
@@ -664,9 +674,6 @@ export default function ConversationScreen() {
                 />
                 {ls.checked && !ls.correct && (
                   <div className="dl-correct-answer">Correct answer: <strong>{ex.answer}</strong>{ex.hint ? ` (${ex.hint})` : ''}</div>
-                )}
-                {voiceOn && (
-                  <button className="dl-hear-btn" onClick={() => speakWord(ex.answer, ttsLang)}>🔊 Hear it</button>
                 )}
               </div>
             </>
@@ -704,22 +711,8 @@ export default function ConversationScreen() {
           )}
         </div>
 
-        {/* Lumi feedback banner */}
-        {ls.checked && ex.kind !== 'pairs' && (
-          <div className={`dl-feedback-banner ${ls.correct ? 'correct' : 'wrong'}`}>
-            <div className="dl-feedback-inner">
-              <Avatar avatarId="seedling" color={ls.correct ? '#7ecf6e' : '#FF4B4B'} size={36} />
-              <div className="dl-feedback-text">
-                {loadingFeedback && !lumiMsg
-                  ? <span className="dl-feedback-loading">Lumi is thinking…</span>
-                  : lumiMsg || (ls.correct ? 'Correct! Keep it up!' : `The answer is "${ex.kind === 'mc' ? ex.options[ex.correct] : ex.kind === 'type' ? ex.answer : ''}"`)}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Footer button */}
-        <div className={`dl-footer ${ls.checked ? (ls.correct ? 'correct' : 'wrong') : ''}`}>
+        <div className="dl-footer">
           {ls.checked ? (
             <button className="dl-continue-btn" onClick={handleContinue}>
               {isLastExercise || ls.hearts === 0 ? 'See results →' : 'Continue →'}
@@ -731,6 +724,19 @@ export default function ConversationScreen() {
             </button>
           )}
         </div>
+
+        {/* Floating AI chat */}
+        <AIChat
+          isOpen={chatOpen}
+          onToggle={() => { setChatOpen(o => !o); setChatUnread(false); }}
+          messages={chatMessages}
+          isLoading={chatLoading}
+          unread={chatUnread}
+          onSend={handleChatSend}
+          ttsLang={ttsLang}
+          currentWord={ex && ex.kind !== 'pairs' ? { target: (ex as MCExercise | TypeExercise).word.target, english: (ex as MCExercise | TypeExercise).word.english } : undefined}
+          langName={langName}
+        />
       </div>
     );
   }
