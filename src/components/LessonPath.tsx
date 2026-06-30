@@ -24,24 +24,31 @@ export default function LessonPath() {
     <div className="path-screen">
       {/* Top bar */}
       <div className="path-topbar">
-        <button className="path-back-btn" onClick={goBack}>←</button>
-        <div className="path-course-info">
-          <span className="path-flags">{course?.fromFlag} → {course?.toFlag}</span>
-          <span className="path-lang-name">{langName}</span>
-        </div>
-        <div className="path-topbar-right">
-          <div className="path-level-chip" title={`${xp} XP`}>
-            <Avatar avatarId={level.avatarId} color={level.color} size={26} />
-            <div className="path-level-bar-wrap">
-              <div className="path-level-bar-fill" style={{ width: `${pct}%`, background: level.color }} />
-            </div>
+        {/* Row 1: nav */}
+        <div className="path-topbar-nav">
+          <button className="path-back-btn" onClick={goBack}>←</button>
+          <div className="path-course-info">
+            <span className="path-flags">{course?.fromFlag} → {course?.toFlag}</span>
+            <span className="path-lang-name">{langName}</span>
           </div>
-          <span className="path-streak">🔥{streak}</span>
-          <button className="path-shop-btn" onClick={openShop} title="Shop">🪙{coins}</button>
-          <button className="path-profile-btn" onClick={openProfile} title="Profile">
-            <Avatar avatarId={level.avatarId} color={level.color} size={28} />
-          </button>
           <button className="path-logout-btn" onClick={logout}>Logout</button>
+        </div>
+        {/* Row 2: action buttons */}
+        <div className="path-topbar-actions">
+          <button className="path-profile-btn" onClick={openProfile}>
+            <Avatar avatarId={level.avatarId} color={level.color} size={22} />
+            <div className="path-profile-btn-info">
+              <span className="path-profile-btn-title" style={{ color: level.color }}>{level.title}</span>
+              <div className="path-level-bar-wrap">
+                <div className="path-level-bar-fill" style={{ width: `${pct}%`, background: level.color }} />
+              </div>
+            </div>
+            <span className="path-profile-btn-lv">Lv {level.level}</span>
+          </button>
+          <div className="path-topbar-pills">
+            <span className="path-pill path-pill--streak">🔥 {streak}</span>
+            <button className="path-pill path-pill--shop" onClick={openShop}>🛍️ Shop · 🪙{coins.toLocaleString()}</button>
+          </div>
         </div>
       </div>
 

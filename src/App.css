@@ -2756,31 +2756,61 @@ input { font-family: inherit; }
   overflow: hidden;
 }
 .path-topbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
+  display: flex; flex-direction: column;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  z-index: 10;
+  flex-shrink: 0; z-index: 10;
+}
+.path-topbar-nav {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px 6px;
+}
+.path-topbar-actions {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px 10px;
 }
 .path-back-btn { background: none; color: var(--text); font-size: 20px; padding: 4px 8px; border-radius: 8px; transition: background .12s; }
 .path-back-btn:hover { background: rgba(255,255,255,.07); }
 .path-course-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
 .path-flags { font-size: 16px; }
 .path-lang-name { font-size: 11px; color: var(--muted); }
-.path-topbar-right { display: flex; align-items: center; gap: 8px; }
-.path-level-chip { display: flex; align-items: center; gap: 6px; }
-.path-level-bar-wrap { width: 40px; height: 4px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
-.path-level-bar-fill { height: 100%; border-radius: 4px; transition: width .3s; }
-.path-streak { font-size: 13px; }
 .path-logout-btn {
   background: none; border: 1px solid var(--border); border-radius: 8px;
   color: var(--muted); font-size: 12px; font-weight: 600; padding: 5px 10px; height: 30px;
   display: flex; align-items: center; justify-content: center; transition: background .12s;
 }
 .path-logout-btn:hover { background: rgba(255,255,255,.07); color: var(--text); }
+
+/* Profile button (row 2) */
+.path-profile-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 7px 12px; transition: all .15s; flex-shrink: 0;
+}
+.path-profile-btn:hover { border-color: var(--lumi); background: rgba(129,140,248,.08); }
+.path-profile-btn-info { display: flex; flex-direction: column; gap: 3px; }
+.path-profile-btn-title { font-size: 12px; font-weight: 800; line-height: 1; }
+.path-level-bar-wrap { width: 50px; height: 4px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; }
+.path-level-bar-fill { height: 100%; border-radius: 4px; transition: width .3s; }
+.path-profile-btn-lv { font-size: 11px; font-weight: 800; color: var(--muted); }
+
+/* Pills row */
+.path-topbar-pills { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
+.path-pill {
+  display: flex; align-items: center; gap: 5px;
+  border-radius: 100px; padding: 6px 14px;
+  font-size: 13px; font-weight: 800; white-space: nowrap;
+}
+.path-pill--streak {
+  background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.25);
+  color: var(--amber);
+}
+.path-pill--shop {
+  background: var(--lumi-dk); border: 1.5px solid var(--lumi);
+  color: #fff; transition: all .15s;
+  box-shadow: 0 2px 12px rgba(79,70,229,.35);
+}
+.path-pill--shop:hover { background: var(--lumi); box-shadow: 0 4px 20px rgba(79,70,229,.5); }
 
 .path-scroll { flex: 1; overflow-y: auto; padding: 16px 16px 80px; }
 
@@ -3264,13 +3294,6 @@ input { font-family: inherit; }
 }
 .shop-reveal-close:hover { background: var(--lumi-dk); transform: translateY(-1px); }
 
-/* Shop button in path topbar */
-.path-shop-btn {
-  background: rgba(251,191,36,.12); border: 1px solid rgba(251,191,36,.3);
-  border-radius: 100px; color: var(--amber); font-size: 13px; font-weight: 800;
-  padding: 4px 12px; transition: all .15s; display: flex; align-items: center; gap: 4px;
-}
-.path-shop-btn:hover { background: rgba(251,191,36,.2); }
 
 /* ═══════════════════════════════════════════════════════════════
    PROFILE
@@ -3390,13 +3413,6 @@ input { font-family: inherit; }
   background: var(--surface); border-radius: 8px; padding: 2px 8px;
 }
 
-/* Profile btn in path topbar */
-.path-profile-btn {
-  background: none; border-radius: 50%; padding: 2px;
-  display: flex; align-items: center; justify-content: center;
-  transition: opacity .15s;
-}
-.path-profile-btn:hover { opacity: 0.8; }
 
 /* Sell buttons */
 .shop-inv-right {
