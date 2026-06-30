@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { CourseId } from '../types';
 import type { Rarity } from '../data/shop';
 import type { ShopItem } from '../data/shop';
-import { SELL_PRICE } from '../data/shop';
+import { SELL_PRICE, ITEMS } from '../data/shop';
 
 interface UserProgress {
   completedLessons: Record<string, string[]>;
@@ -92,6 +92,21 @@ export const useAppStore = create<AppStore>()(
       login: (user) => {
         const progress = loadProgress(user.id);
         localStorage.setItem('lumi-user', JSON.stringify(user));
+        if (user.email === 'elliot@themaclan.com') {
+          // Admin: override with max stats
+          const adminInv: Record<string, number> = {};
+          ITEMS.forEach(i => { adminInv[i.id] = 99; });
+          const adminProgress: UserProgress = {
+            ...progress,
+            xp: 9999,
+            coins: 99999,
+            streak: 999,
+            inventory: adminInv,
+          };
+          saveProgress(user.id, adminProgress);
+          set({ user, screen: 'select', ...adminProgress });
+          return;
+        }
         set({ user, screen: 'select', ...progress });
       },
 
