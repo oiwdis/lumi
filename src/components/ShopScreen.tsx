@@ -85,19 +85,24 @@ export default function ShopScreen() {
                     {selectedBox?.id === box.id && !locked && (
                       <div className="shop-box-detail" onClick={e => e.stopPropagation()}>
                         <div className="shop-odds">
-                          {(Object.entries(box.rarityWeights) as [string, number][])
-                            .filter(([, w]) => w > 0)
-                            .map(([rarity, weight]) => {
-                              const total = Object.values(box.rarityWeights).reduce((a, b) => a + b, 0);
-                              const pct = Math.round((weight / total) * 100);
-                              return (
-                                <div key={rarity} className="shop-odd-row">
-                                  <span className="shop-odd-dot" style={{ background: RARITY_COLOR[rarity as keyof typeof RARITY_COLOR] }} />
-                                  <span className="shop-odd-label">{RARITY_LABEL[rarity as keyof typeof RARITY_LABEL]}</span>
-                                  <span className="shop-odd-pct">{pct}%</span>
-                                </div>
-                              );
-                            })}
+                          {(() => {
+                            const total = Object.values(box.rarityWeights).reduce((a, b) => a + b, 0);
+                            return (Object.entries(box.rarityWeights) as [string, number][])
+                              .filter(([, w]) => w > 0)
+                              .flatMap(([rarity, weight]) => {
+                                const pets = ITEMS.filter(i => i.biome === box.biome && i.rarity === rarity);
+                                if (pets.length === 0) return [];
+                                const petPct = (weight / total / pets.length) * 100;
+                                return pets.map(pet => (
+                                  <div key={pet.id} className="shop-odd-row">
+                                    <span className="shop-odd-dot" style={{ background: RARITY_COLOR[rarity as keyof typeof RARITY_COLOR] }} />
+                                    <span className="shop-odd-emoji">{pet.emoji}</span>
+                                    <span className="shop-odd-label">{pet.name}</span>
+                                    <span className="shop-odd-pct">{petPct < 1 ? petPct.toFixed(1) : Math.round(petPct)}%</span>
+                                  </div>
+                                ));
+                              });
+                          })()}
                         </div>
                         <div className="shop-items-per">
                           {box.itemsPerOpen} item{box.itemsPerOpen > 1 ? 's' : ''} per open

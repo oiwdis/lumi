@@ -3222,6 +3222,7 @@ input { font-family: inherit; }
 .shop-odds { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .shop-odd-row { display: flex; align-items: center; gap: 8px; }
 .shop-odd-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.shop-odd-emoji { font-size: 15px; flex-shrink: 0; }
 .shop-odd-label { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
 .shop-odd-pct { font-size: 13px; font-weight: 800; color: var(--muted); }
 .shop-items-per { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
