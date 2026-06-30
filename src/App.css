@@ -3519,3 +3519,29 @@ input { font-family: inherit; }
   padding: 6px 18px; font-weight: 700; transition: all .12s;
 }
 .char-picker-back:hover { background: rgba(248,113,113,.22); }
+
+/* ── Results coin breakdown ── */
+.results-coins-card {
+  width: 100%; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 18px;
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;
+  margin: 4px 0;
+}
+.results-coins-title {
+  font-size: 13px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px;
+}
+.results-coin-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 14px;
+}
+.results-coin-label { color: #C4C4D8; }
+.results-coin-val { font-weight: 800; color: var(--amber); }
+.results-coin-row--boost { opacity: .85; }
+.results-coin-boost { color: var(--lumi); }
+.results-coin-total {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 10px; border-top: 1px solid var(--border);
+  font-size: 15px; font-weight: 800; color: var(--text);
+}
+.results-coin-total-val { color: var(--amber); font-size: 18px; }

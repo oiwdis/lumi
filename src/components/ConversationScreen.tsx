@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { COURSES } from '../data';
+import { ITEMS } from '../data/shop';
 import { TOPICS, type Topic, type Word } from '../data/lessonWords';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
 import Avatar from './Avatar';
@@ -234,8 +235,14 @@ async function fetchAIResponse(
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function ConversationScreen() {
-  const { selectedCourse, currentLessonId, user, xp, streak, addXp, goBack, completeLesson, logout } = useAppStore();
+  const { selectedCourse, currentLessonId, user, xp, streak, equippedPet, addXp, goBack, completeLesson, logout } = useAppStore();
   const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja';
+
+  // Track coins earned during this lesson session
+  const lessonCoinsRef = useRef(0);
+  const equippedItem = equippedPet ? ITEMS.find(i => i.id === equippedPet) ?? null : null;
+  const coinMult = equippedItem?.ability.type === 'coin_boost' ? equippedItem.ability.value : 1;
+  const xpMult   = equippedItem?.ability.type === 'xp_boost'  ? equippedItem.ability.value : 1;
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const ttsLang = selectedCourse ? TTS_LANG[selectedCourse] : 'es-ES';
   const langName = selectedCourse ? LANG_NAME[selectedCourse] : 'Spanish';
@@ -281,6 +288,7 @@ export default function ConversationScreen() {
     setTopic(t);
     setLs(initExercise(state));
     setChatMessages([]);
+    lessonCoinsRef.current = 0;
     setScreen('lesson');
   }, [allWords, langName]);
 
@@ -307,7 +315,9 @@ export default function ConversationScreen() {
     const newHearts = correct ? ls.hearts : Math.max(0, ls.hearts - 1);
     const newScore = correct ? ls.score + 1 : ls.score;
     setLs(prev => prev ? { ...prev, checked: true, correct, hearts: newHearts, score: newScore } : prev);
-    addXp(correct ? 20 : 5);
+    const xpAmt = correct ? 20 : 5;
+    lessonCoinsRef.current += Math.round(Math.floor(xpAmt / 4) * coinMult);
+    addXp(xpAmt);
 
     // Push AI feedback into chat
     const word = (ex as MCExercise | TypeExercise).word;
@@ -374,7 +384,7 @@ export default function ConversationScreen() {
     if (matched) {
       const newMatched = [...ls.pairsMatched, leftVal, rightVal];
       const allDone = newMatched.length === ex.wordPairs.length * 2;
-      if (allDone) addXp(30);
+      if (allDone) { lessonCoinsRef.current += Math.round(Math.floor(30 / 4) * coinMult); addXp(30); }
       setLs(prev => prev ? {
         ...prev,
         pairsMatched: newMatched,
@@ -393,6 +403,7 @@ export default function ConversationScreen() {
     const q = quiz.questions[quiz.idx];
     const correct = quiz.selected === q.correct;
     const newScore = correct ? quiz.score + 1 : quiz.score;
+    if (correct) lessonCoinsRef.current += Math.round(Math.floor(15 / 4) * coinMult);
     addXp(correct ? 15 : 0);
     setQuiz(prev => prev ? { ...prev, checked: true, correct, score: newScore } : prev);
   }, [quiz, addXp]);
@@ -617,6 +628,9 @@ export default function ConversationScreen() {
     const score = ls ? ls.score : 0;
     const hearts = ls ? ls.hearts : 0;
     const pct100 = Math.round((score / totalEx) * 100);
+    const coinsFromAnswers = lessonCoinsRef.current;
+    const completionBonus = Math.round(50 * coinMult);
+    const totalCoins = coinsFromAnswers + completionBonus;
     return (
       <div className="conv-screen">
         <TopBar onBack={completeLesson} />
@@ -627,6 +641,35 @@ export default function ConversationScreen() {
             <div className="dl-stat"><span className="dl-stat-num">{score}/{totalEx}</span><span className="dl-stat-lbl">Lesson</span></div>
             <div className="dl-stat"><span className="dl-stat-num">{quizScore}/5</span><span className="dl-stat-lbl">🎯 Quiz</span></div>
             <div className="dl-stat"><span className="dl-stat-num">{hearts}⚡</span><span className="dl-stat-lbl">Energy</span></div>
+          </div>
+
+          {/* Coin breakdown */}
+          <div className="results-coins-card">
+            <div className="results-coins-title">🪙 Coins earned</div>
+            <div className="results-coin-row">
+              <span className="results-coin-label">Correct answers</span>
+              <span className="results-coin-val">+{coinsFromAnswers}</span>
+            </div>
+            <div className="results-coin-row">
+              <span className="results-coin-label">Lesson complete bonus</span>
+              <span className="results-coin-val">+{completionBonus}</span>
+            </div>
+            {coinMult > 1 && equippedItem && (
+              <div className="results-coin-row results-coin-row--boost">
+                <span className="results-coin-label">{equippedItem.emoji} {equippedItem.name} boost</span>
+                <span className="results-coin-val results-coin-boost">{equippedItem.ability.label}</span>
+              </div>
+            )}
+            {xpMult > 1 && equippedItem && (
+              <div className="results-coin-row results-coin-row--boost">
+                <span className="results-coin-label">{equippedItem.emoji} {equippedItem.name} boost</span>
+                <span className="results-coin-val results-coin-boost">{equippedItem.ability.label}</span>
+              </div>
+            )}
+            <div className="results-coin-total">
+              <span>Total</span>
+              <span className="results-coin-total-val">🪙 {totalCoins}</span>
+            </div>
           </div>
           {topic && (
             <div className="dl-words-review">
