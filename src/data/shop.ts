@@ -182,7 +182,7 @@ export const BOXES: Box[] = [
     color: '#34D399',
     levelRequired: 1,
     itemsPerOpen: 2,
-    rarityWeights: { common: 60, uncommon: 28, rare: 9, epic: 2, legendary: 1 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
   {
     id: 'ocean',
@@ -194,7 +194,7 @@ export const BOXES: Box[] = [
     color: '#38BDF8',
     levelRequired: 2,
     itemsPerOpen: 2,
-    rarityWeights: { common: 55, uncommon: 30, rare: 11, epic: 3, legendary: 1 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
   {
     id: 'arctic',
@@ -206,7 +206,7 @@ export const BOXES: Box[] = [
     color: '#BAE6FD',
     levelRequired: 3,
     itemsPerOpen: 2,
-    rarityWeights: { common: 50, uncommon: 30, rare: 14, epic: 5, legendary: 1 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
   {
     id: 'savanna',
@@ -218,7 +218,7 @@ export const BOXES: Box[] = [
     color: '#FCD34D',
     levelRequired: 4,
     itemsPerOpen: 3,
-    rarityWeights: { common: 45, uncommon: 30, rare: 17, epic: 6, legendary: 2 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
   {
     id: 'jungle',
@@ -230,7 +230,7 @@ export const BOXES: Box[] = [
     color: '#86EFAC',
     levelRequired: 5,
     itemsPerOpen: 3,
-    rarityWeights: { common: 40, uncommon: 30, rare: 20, epic: 8, legendary: 2 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
   {
     id: 'desert',
@@ -242,7 +242,7 @@ export const BOXES: Box[] = [
     color: '#FCA5A5',
     levelRequired: 6,
     itemsPerOpen: 3,
-    rarityWeights: { common: 35, uncommon: 30, rare: 22, epic: 10, legendary: 3 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
   {
     id: 'mountain',
@@ -254,7 +254,7 @@ export const BOXES: Box[] = [
     color: '#C4B5FD',
     levelRequired: 7,
     itemsPerOpen: 3,
-    rarityWeights: { common: 28, uncommon: 30, rare: 25, epic: 13, legendary: 4 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
   {
     id: 'swamp',
@@ -266,7 +266,7 @@ export const BOXES: Box[] = [
     color: '#6EE7B7',
     levelRequired: 8,
     itemsPerOpen: 4,
-    rarityWeights: { common: 20, uncommon: 28, rare: 28, epic: 18, legendary: 6 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
   {
     id: 'sky',
@@ -278,7 +278,7 @@ export const BOXES: Box[] = [
     color: '#93C5FD',
     levelRequired: 9,
     itemsPerOpen: 4,
-    rarityWeights: { common: 12, uncommon: 25, rare: 32, epic: 22, legendary: 9 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
   {
     id: 'mythical',
@@ -290,7 +290,7 @@ export const BOXES: Box[] = [
     color: '#F59E0B',
     levelRequired: 10,
     itemsPerOpen: 4,
-    rarityWeights: { common: 5, uncommon: 18, rare: 35, epic: 30, legendary: 12 },
+    rarityWeights: { common: 60, uncommon: 25, rare: 10, epic: 4, legendary: 1 },
   },
 ];
 
