@@ -586,9 +586,11 @@ export default function ConversationScreen() {
   }
 
   // RESULTS
-  if (screen === 'results' && ls && topic) {
-    const totalEx = ls.exercises.filter(e => e.kind !== 'pairs').length;
-    const pct100 = Math.round((ls.score / totalEx) * 100);
+  if (screen === 'results') {
+    const totalEx = ls ? ls.exercises.filter(e => e.kind !== 'pairs').length : 1;
+    const score = ls ? ls.score : 0;
+    const hearts = ls ? ls.hearts : 0;
+    const pct100 = Math.round((score / totalEx) * 100);
     return (
       <div className="conv-screen">
         <TopBar onBack={completeLesson} />
@@ -596,24 +598,27 @@ export default function ConversationScreen() {
           <div className="dl-results-icon">{pct100 === 100 ? '🏆' : pct100 >= 60 ? '⭐' : '💪'}</div>
           <h2 className="dl-results-title">Lesson complete!</h2>
           <div className="dl-results-stats">
-            <div className="dl-stat"><span className="dl-stat-num">{ls.score}/{totalEx}</span><span className="dl-stat-lbl">Lesson</span></div>
+            <div className="dl-stat"><span className="dl-stat-num">{score}/{totalEx}</span><span className="dl-stat-lbl">Lesson</span></div>
             <div className="dl-stat"><span className="dl-stat-num">{quizScore}/5</span><span className="dl-stat-lbl">🎯 Quiz</span></div>
-            <div className="dl-stat"><span className="dl-stat-num">{ls.hearts}⚡</span><span className="dl-stat-lbl">Energy</span></div>
+            <div className="dl-stat"><span className="dl-stat-num">{hearts}⚡</span><span className="dl-stat-lbl">Energy</span></div>
           </div>
-          <div className="dl-words-review">
-            {topic.words.map((w, i) => (
-              <div key={i} className="dl-word-row">
-                {voiceOn && <button className="dl-word-play" onClick={() => speakWord(w.target, ttsLang)}>🔊</button>}
-                <span className="dl-word-target">{w.target}</span>
-                {w.hint && <span className="dl-word-hint">{w.hint}</span>}
-                <span className="dl-word-en">= {w.english}</span>
-              </div>
-            ))}
-          </div>
+          {topic && (
+            <div className="dl-words-review">
+              {topic.words.map((w, i) => (
+                <div key={i} className="dl-word-row">
+                  <span className="dl-word-target">{w.target}</span>
+                  {w.hint && <span className="dl-word-hint">{w.hint}</span>}
+                  <span className="dl-word-en">= {w.english}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <button className="dl-continue-btn" onClick={completeLesson}>
             {pct100 >= 60 ? 'Continue →' : 'Back to path →'}
           </button>
-          <button className="conv-back-link" onClick={() => handleStartLesson(topic, mode)}>Practice again</button>
+          {topic && ls && (
+            <button className="conv-back-link" onClick={() => handleStartLesson(topic, mode)}>Practice again</button>
+          )}
         </div>
       </div>
     );
