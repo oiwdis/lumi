@@ -235,6 +235,7 @@ async function fetchAIResponse(
 
 export default function ConversationScreen() {
   const { selectedCourse, currentLessonId, user, xp, streak, addXp, goBack, completeLesson, logout } = useAppStore();
+  const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja';
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const ttsLang = selectedCourse ? TTS_LANG[selectedCourse] : 'es-ES';
   const langName = selectedCourse ? LANG_NAME[selectedCourse] : 'Spanish';
@@ -265,6 +266,10 @@ export default function ConversationScreen() {
 
   // Pool of all words for this language (for distractors)
   const allWords = topics.flatMap(t => t.words);
+  // Characters available in the picker — unique chars from all lesson target words
+  const pickerChars = usesCharPicker
+    ? [...new Set(allWords.flatMap(w => [...w.target]))]
+    : [];
 
   const ex = ls ? ls.exercises[ls.idx] : null;
   const total = ls ? ls.exercises.length : 1;
@@ -708,17 +713,39 @@ export default function ConversationScreen() {
                 <input
                   ref={inputRef}
                   className={`dl-type-input ${ls.checked ? (ls.correct ? 'correct' : 'wrong') : ''}`}
-                  placeholder={`Type in ${langName}…`}
+                  placeholder={usesCharPicker ? `Tap characters below…` : `Type in ${langName}…`}
                   value={ls.typed}
                   onChange={e => !ls.checked && setLs(prev => prev ? { ...prev, typed: e.target.value } : prev)}
                   onKeyDown={e => e.key === 'Enter' && !ls.checked && ls.typed.trim() && handleCheck()}
                   disabled={ls.checked}
-                  autoFocus
+                  autoFocus={!usesCharPicker}
+                  readOnly={usesCharPicker}
                 />
                 {ls.checked && !ls.correct && (
                   <div className="dl-correct-answer">Correct answer: <strong>{ex.answer}</strong>{ex.hint ? ` (${ex.hint})` : ''}</div>
                 )}
               </div>
+              {usesCharPicker && !ls.checked && (
+                <div className="char-picker">
+                  <div className="char-picker-grid">
+                    {pickerChars.map((ch, i) => (
+                      <button
+                        key={i}
+                        className="char-picker-btn"
+                        onClick={() => setLs(prev => prev ? { ...prev, typed: prev.typed + ch } : prev)}
+                      >
+                        {ch}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="char-picker-back"
+                    onClick={() => setLs(prev => prev ? { ...prev, typed: prev.typed.slice(0, -1) } : prev)}
+                  >
+                    ⌫
+                  </button>
+                </div>
+              )}
             </>
           )}
 

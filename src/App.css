@@ -3490,3 +3490,32 @@ input { font-family: inherit; }
 
 /* ── Pet emoji in path topbar profile button ── */
 .path-profile-btn-pet { font-size: 22px; line-height: 1; }
+
+/* ── Character picker ── */
+.char-picker {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  margin-top: 4px;
+}
+.char-picker-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+}
+.char-picker-btn {
+  width: 48px; height: 48px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; font-size: 22px; color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  transition: all .12s; flex-shrink: 0;
+}
+.char-picker-btn:hover { background: rgba(129,140,248,.15); border-color: var(--lumi); }
+.char-picker-btn:active { transform: scale(.92); }
+.char-picker-back {
+  align-self: flex-end;
+  background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.25);
+  border-radius: 10px; color: var(--rose); font-size: 18px;
+  padding: 6px 18px; font-weight: 700; transition: all .12s;
+}
+.char-picker-back:hover { background: rgba(248,113,113,.22); }
