@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CourseId } from '../types';
+import type { Rarity } from '../data/shop';
 import type { ShopItem } from '../data/shop';
+import { SELL_PRICE } from '../data/shop';
 
 interface UserProgress {
   completedLessons: Record<string, string[]>;
@@ -52,6 +54,7 @@ interface AppStore {
   addToInventory: (items: ShopItem[]) => void;
   openShop: () => void;
   openProfile: () => void;
+  sellItem: (itemId: string, rarity: Rarity) => void;
   resetProgress: () => void;
 }
 
@@ -170,6 +173,16 @@ export const useAppStore = create<AppStore>()(
           }
         }
         const newCoins = s.coins + bonusCoins;
+        set({ inventory: newInv, coins: newCoins });
+        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), inventory: newInv, coins: newCoins });
+      },
+
+      sellItem: (itemId, rarity) => {
+        const s = get();
+        if ((s.inventory[itemId] ?? 0) < 1) return;
+        const newInv = { ...s.inventory, [itemId]: s.inventory[itemId] - 1 };
+        if (newInv[itemId] === 0) delete newInv[itemId];
+        const newCoins = s.coins + SELL_PRICE[rarity];
         set({ inventory: newInv, coins: newCoins });
         if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), inventory: newInv, coins: newCoins });
       },

@@ -1,11 +1,11 @@
 import { useAppStore } from '../store/useAppStore';
 import { LEVELS, getLevelForXp, getNextLevel, xpProgressInLevel } from '../lib/levels';
 import { COURSES } from '../data';
-import { ITEMS, RARITY_COLOR, RARITY_LABEL } from '../data/shop';
+import { ITEMS, RARITY_COLOR, RARITY_LABEL, SELL_PRICE } from '../data/shop';
 import Avatar from './Avatar';
 
 export default function ProfileScreen() {
-  const { user, xp, coins, streak, inventory, completedLessons, goBack } = useAppStore();
+  const { user, xp, coins, streak, inventory, completedLessons, goBack, sellItem } = useAppStore();
   const level = getLevelForXp(xp);
   const next = getNextLevel(xp);
   const { earned, needed, pct } = xpProgressInLevel(xp);
@@ -130,6 +130,13 @@ export default function ProfileScreen() {
                   {(inventory[item.id] ?? 0) > 1 && (
                     <span className="profile-inv-chip-count">×{inventory[item.id]}</span>
                   )}
+                  <button
+                    className="profile-sell-btn"
+                    onClick={() => sellItem(item.id, item.rarity)}
+                    title={`Sell for ${SELL_PRICE[item.rarity]} coins`}
+                  >
+                    Sell · 🪙{SELL_PRICE[item.rarity]}
+                  </button>
                 </div>
               ))}
             </div>

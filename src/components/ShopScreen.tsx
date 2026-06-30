@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { BOXES, ITEMS, openBox, RARITY_COLOR, RARITY_LABEL, type Box, type ShopItem } from '../data/shop';
+import { BOXES, ITEMS, openBox, RARITY_COLOR, RARITY_LABEL, SELL_PRICE, type Box, type ShopItem } from '../data/shop';
 import { getLevelForXp } from '../lib/levels';
 
 export default function ShopScreen() {
-  const { coins, xp, inventory, goBack, spendCoins, addToInventory } = useAppStore();
+  const { coins, xp, inventory, goBack, spendCoins, addToInventory, sellItem } = useAppStore();
   const level = getLevelForXp(xp);
 
   const [selectedBox, setSelectedBox] = useState<Box | null>(null);
@@ -131,7 +131,16 @@ export default function ShopScreen() {
                       <div className="shop-inv-desc">{item.description}</div>
                       <div className="shop-inv-rarity" style={{ color: RARITY_COLOR[item.rarity] }}>{RARITY_LABEL[item.rarity]}</div>
                     </div>
-                    <div className="shop-inv-count">×{inventory[item.id]}</div>
+                    <div className="shop-inv-right">
+                      {(inventory[item.id] ?? 0) > 1 && <div className="shop-inv-count">×{inventory[item.id]}</div>}
+                      <button
+                        className="shop-sell-btn"
+                        onClick={() => sellItem(item.id, item.rarity)}
+                        title={`Sell for ${SELL_PRICE[item.rarity]} coins`}
+                      >
+                        Sell · 🪙{SELL_PRICE[item.rarity]}
+                      </button>
+                    </div>
                   </div>
                 ))
             }

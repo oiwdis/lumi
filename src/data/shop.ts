@@ -1,4 +1,12 @@
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export const SELL_PRICE: Record<Rarity, number> = {
+  common: 10,
+  uncommon: 25,
+  rare: 70,
+  epic: 200,
+  legendary: 600,
+};
 export type ItemType = 'xp_boost' | 'streak_shield' | 'heart_refill' | 'coins' | 'title' | 'avatar';
 
 export interface ShopItem {

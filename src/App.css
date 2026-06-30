@@ -3397,3 +3397,16 @@ input { font-family: inherit; }
   transition: opacity .15s;
 }
 .path-profile-btn:hover { opacity: 0.8; }
+
+/* Sell buttons */
+.shop-inv-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0;
+}
+.shop-sell-btn, .profile-sell-btn {
+  background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.3);
+  color: var(--rose); font-size: 12px; font-weight: 800;
+  border-radius: 100px; padding: 4px 10px; transition: all .15s; white-space: nowrap;
+}
+.shop-sell-btn:hover, .profile-sell-btn:hover {
+  background: rgba(248,113,113,.25); border-color: var(--rose);
+}
