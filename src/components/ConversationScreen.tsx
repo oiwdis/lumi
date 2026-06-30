@@ -436,18 +436,26 @@ export default function ConversationScreen() {
       ? { target: (ex as MCExercise | TypeExercise).word.target, english: (ex as MCExercise | TypeExercise).word.english }
       : undefined;
 
+    // Build lesson context so the AI always knows what's being studied
+    const lessonContext = topic
+      ? `The student is on the "${topic.title}" lesson (${topic.emoji}), learning ${langName} vocabulary. ` +
+        `The words in this lesson are: ${topic.words.map(w => `"${w.target}" (${w.english})${w.hint ? ` [${w.hint}]` : ''}`).join(', ')}. ` +
+        (currentWord ? `They are currently practising the word "${currentWord.target}" (${currentWord.english}). ` : '') +
+        (ex ? `Exercise type: ${ex.kind === 'mc' ? 'multiple choice' : ex.kind === 'type' ? 'type the answer' : 'match pairs'}. ` : '')
+      : `The student is learning ${langName}. `;
+
     let prompt: string;
     let systemPrompt: string;
 
     if (isPronunciation && currentWord) {
-      prompt = `A student is learning ${langName}. They were trying to say the word "${currentWord.target}" (meaning "${currentWord.english}"). Speech recognition (using the browser's default language) transcribed their attempt as: "${text}". This transcript is a phonetic approximation — judge whether it sounds close to the correct ${langName} pronunciation. Give a clear verdict (correct / close / needs work) and one short tip. Be encouraging.`;
-      systemPrompt = `You are Lumi, a ${langName} pronunciation coach. Max 2 sentences. No markdown. Be warm and specific.`;
+      prompt = `The student tried to say "${currentWord.target}" (${currentWord.english}). Speech recognition heard: "${text}". Judge whether this sounds close to the correct ${langName} pronunciation. Give a clear verdict (correct / close / needs work) and one short tip.`;
+      systemPrompt = `You are Lumi, a ${langName} tutor. ${lessonContext}Max 2 sentences. No markdown. Be warm and specific.`;
     } else if (isPronunciation) {
-      prompt = `A student learning ${langName} spoke and speech recognition heard: "${text}". Respond helpfully in the context of their ${langName} lesson.`;
-      systemPrompt = `You are Lumi, a friendly ${langName} tutor. Max 2 sentences. No markdown.`;
+      prompt = `The student spoke and speech recognition heard: "${text}". Respond helpfully.`;
+      systemPrompt = `You are Lumi, a ${langName} tutor. ${lessonContext}Max 2 sentences. No markdown.`;
     } else {
       prompt = text;
-      systemPrompt = `You are Lumi, a friendly ${langName} tutor. Answer concisely (2-3 sentences max). No markdown. If asked about a word or phrase, give the ${langName} translation and a usage tip.`;
+      systemPrompt = `You are Lumi, a friendly ${langName} tutor. ${lessonContext}Answer concisely (2-3 sentences). No markdown. Reference the current lesson words when relevant.`;
     }
 
     const aiMsgId = String(++chatMsgIdRef.current);
