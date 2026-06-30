@@ -2,6 +2,7 @@ import { useAppStore } from '../store/useAppStore';
 import { LESSON_UNITS, FLAT_LESSONS } from '../data/lessonPath';
 import { COURSES } from '../data';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
+import { ITEMS } from '../data/shop';
 import Avatar from './Avatar';
 
 const LANG_NAME: Record<string, string> = {
@@ -9,7 +10,8 @@ const LANG_NAME: Record<string, string> = {
 };
 
 export default function LessonPath() {
-  const { selectedCourse, completedLessons, xp, streak, coins, startLesson, goBack, logout, openShop, openProfile } = useAppStore();
+  const { selectedCourse, completedLessons, xp, streak, coins, equippedPet, startLesson, goBack, logout, openShop, openProfile } = useAppStore();
+  const equippedItem = equippedPet ? ITEMS.find(i => i.id === equippedPet) : null;
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const langName = selectedCourse ? (LANG_NAME[selectedCourse] ?? 'Unknown') : '';
   const done = selectedCourse ? (completedLessons[selectedCourse] ?? []) : [];
@@ -36,9 +38,14 @@ export default function LessonPath() {
         {/* Row 2: action buttons */}
         <div className="path-topbar-actions">
           <button className="path-profile-btn" onClick={openProfile}>
-            <Avatar avatarId={level.avatarId} color={level.color} size={22} />
+            {equippedItem
+              ? <span className="path-profile-btn-pet">{equippedItem.emoji}</span>
+              : <Avatar avatarId={level.avatarId} color={level.color} size={22} />
+            }
             <div className="path-profile-btn-info">
-              <span className="path-profile-btn-title" style={{ color: level.color }}>{level.title}</span>
+              <span className="path-profile-btn-title" style={{ color: level.color }}>
+                {equippedItem ? equippedItem.name : level.title}
+              </span>
               <div className="path-level-bar-wrap">
                 <div className="path-level-bar-fill" style={{ width: `${pct}%`, background: level.color }} />
               </div>

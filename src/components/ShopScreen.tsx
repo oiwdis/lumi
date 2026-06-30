@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { BOXES, ITEMS, openBox, RARITY_COLOR, RARITY_LABEL, SELL_PRICE, type Box, type ShopItem } from '../data/shop';
+import { BOXES, ITEMS, openBox, RARITY_COLOR, RARITY_LABEL, SELL_PRICE, type Box, type ShopItem, type AbilityType } from '../data/shop';
 import { getLevelForXp } from '../lib/levels';
 
 export default function ShopScreen() {
-  const { coins, xp, inventory, goBack, spendCoins, addToInventory, sellItem } = useAppStore();
+  const { coins, xp, inventory, equippedPet, goBack, spendCoins, addToInventory, sellItem, equipPet } = useAppStore();
   const level = getLevelForXp(xp);
 
   const [selectedBox, setSelectedBox] = useState<Box | null>(null);
@@ -123,26 +123,35 @@ export default function ShopScreen() {
           <div className="shop-inventory">
             {ownedItems.length === 0
               ? <div className="shop-inv-empty">Your inventory is empty. Open some packs!</div>
-              : ownedItems.map(item => (
-                  <div key={item.id} className="shop-inv-item" style={{ '--rarity-color': RARITY_COLOR[item.rarity] } as React.CSSProperties}>
-                    <span className="shop-inv-emoji">{item.emoji}</span>
-                    <div className="shop-inv-info">
-                      <div className="shop-inv-name">{item.name}</div>
-                      <div className="shop-inv-desc">{item.description}</div>
-                      <div className="shop-inv-rarity" style={{ color: RARITY_COLOR[item.rarity] }}>{RARITY_LABEL[item.rarity]}</div>
+              : ownedItems.map(item => {
+                  const isEquipped = equippedPet === item.id;
+                  const abilityColor: Record<AbilityType, string> = { xp_boost: 'var(--lumi)', coin_boost: 'var(--amber)' };
+                  return (
+                    <div key={item.id} className={`shop-inv-item ${isEquipped ? 'shop-inv-item--equipped' : ''}`} style={{ '--rarity-color': RARITY_COLOR[item.rarity] } as React.CSSProperties}>
+                      <span className="shop-inv-emoji">{item.emoji}</span>
+                      <div className="shop-inv-info">
+                        <div className="shop-inv-name">{item.name}</div>
+                        <div className="shop-inv-ability" style={{ color: abilityColor[item.ability.type] }}>{item.ability.label}</div>
+                        <div className="shop-inv-rarity" style={{ color: RARITY_COLOR[item.rarity] }}>{RARITY_LABEL[item.rarity]}</div>
+                      </div>
+                      <div className="shop-inv-right">
+                        {(inventory[item.id] ?? 0) > 1 && <div className="shop-inv-count">×{inventory[item.id]}</div>}
+                        <button
+                          className={`shop-equip-btn ${isEquipped ? 'shop-equip-btn--active' : ''}`}
+                          onClick={() => equipPet(isEquipped ? null : item.id)}
+                        >
+                          {isEquipped ? 'Unequip' : 'Equip'}
+                        </button>
+                        <button
+                          className="shop-sell-btn"
+                          onClick={() => sellItem(item.id, item.rarity)}
+                        >
+                          Sell · 🪙{SELL_PRICE[item.rarity]}
+                        </button>
+                      </div>
                     </div>
-                    <div className="shop-inv-right">
-                      {(inventory[item.id] ?? 0) > 1 && <div className="shop-inv-count">×{inventory[item.id]}</div>}
-                      <button
-                        className="shop-sell-btn"
-                        onClick={() => sellItem(item.id, item.rarity)}
-                        title={`Sell for ${SELL_PRICE[item.rarity]} coins`}
-                      >
-                        Sell · 🪙{SELL_PRICE[item.rarity]}
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
             }
           </div>
         )}
