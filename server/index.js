@@ -143,17 +143,25 @@ Rules:
   try {
     const response = await client.messages.create({
       model: 'claude-opus-4-8',
-      max_tokens: 4000,
+      max_tokens: 8000,
       thinking: { type: 'adaptive' },
       system: systemPrompt,
       messages: [{ role: 'user', content: `Course: ${courseId}\nLearner's goal: ${goal}` }],
     });
 
     const text = response.content.find(b => b.type === 'text')?.text ?? '';
-    // Extract JSON from response (strip any accidental markdown)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return res.status(500).json({ error: 'AI returned invalid JSON' });
-    const plan = JSON.parse(jsonMatch[0]);
+    // Strip markdown code fences if present
+    const stripped = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
+    // Find outermost JSON object
+    const start = stripped.indexOf('{');
+    const end = stripped.lastIndexOf('}');
+    if (start === -1 || end === -1) return res.status(500).json({ error: 'AI returned no JSON' });
+    let plan;
+    try {
+      plan = JSON.parse(stripped.slice(start, end + 1));
+    } catch (parseErr) {
+      return res.status(500).json({ error: 'AI returned malformed JSON: ' + parseErr.message });
+    }
     res.json(plan);
   } catch (err) {
     res.status(500).json({ error: err.message });
