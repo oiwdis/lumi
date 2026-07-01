@@ -3,7 +3,6 @@ import LoginScreen from './components/LoginScreen';
 import LanguageSelect from './components/LanguageSelect';
 import LessonPath from './components/LessonPath';
 import ConversationScreen from './components/ConversationScreen';
-import ShopScreen from './components/ShopScreen';
 import ProfileScreen from './components/ProfileScreen';
 import OnboardingChat from './components/OnboardingChat';
 import './App.css';
@@ -19,7 +18,6 @@ export default function App() {
       {screen === 'onboarding' && <OnboardingChat />}
       {screen === 'path' && <LessonPath />}
       {screen === 'chat' && <ConversationScreen />}
-      {screen === 'shop' && <ShopScreen />}
       {screen === 'profile' && <ProfileScreen />}
     </div>
   );

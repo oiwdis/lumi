@@ -2,6 +2,7 @@ export interface Word {
   target: string;
   english: string;
   hint?: string;
+  reading?: string; // pinyin for zh, romaji for ja
 }
 
 export interface Topic {

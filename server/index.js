@@ -107,6 +107,13 @@ app.post('/api/customize', async (req, res) => {
 
   const COLORS = ['#58CC02','#1CB0F6','#FF9600','#CE82FF','#FF4B4B','#00C4CC'];
 
+  const isCJK = courseId === 'en-zh' || courseId === 'en-ja';
+  const readingNote = courseId === 'en-zh'
+    ? 'Add a "reading" field to each word with the pinyin pronunciation (e.g. "nǐ hǎo").'
+    : courseId === 'en-ja'
+    ? 'Add a "reading" field to each word with the romaji pronunciation (e.g. "konnichiwa").'
+    : '';
+
   const systemPrompt = `You are a language curriculum designer. Given a learner's goal, create a highly practical, personalized ${language} lesson plan. Return ONLY valid JSON matching this exact schema, no markdown, no explanation:
 
 {
@@ -123,7 +130,7 @@ app.post('/api/customize', async (req, res) => {
           "title": "Lesson Title",
           "emoji": "single emoji",
           "words": [
-            { "english": "phrase in English", "target": "phrase in ${language}" }
+            { "english": "phrase in English", "target": "phrase in ${language}"${isCJK ? ', "reading": "pronunciation"' : ''} }
           ]
         }
       ]
@@ -138,7 +145,7 @@ Rules:
 - Tailor everything tightly to the learner's stated goal — no generic vocabulary
 - Unit colors must come from this list: ${COLORS.join(', ')}
 - All target language text must be accurate ${language}
-- Keep lesson titles short (2–3 words)`;
+- Keep lesson titles short (2–3 words)${readingNote ? '\n- ' + readingNote : ''}`;
 
   try {
     const response = await client.messages.create({

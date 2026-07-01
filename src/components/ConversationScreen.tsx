@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { COURSES } from '../data';
-import { ITEMS } from '../data/shop';
 import { TOPICS, type Topic, type Word } from '../data/lessonWords';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
 import Avatar from './Avatar';
@@ -235,14 +234,12 @@ async function fetchAIResponse(
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function ConversationScreen() {
-  const { selectedCourse, currentLessonId, user, xp, streak, equippedPet, customLessons, addXp, goBack, completeLesson, logout } = useAppStore();
+  const { selectedCourse, currentLessonId, user, xp, streak, customLessons, addXp, goBack, completeLesson, logout } = useAppStore();
   const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja';
+  const showReadings = selectedCourse === 'en-zh' || selectedCourse === 'en-ja';
 
   // Track coins earned during this lesson session
   const lessonCoinsRef = useRef(0);
-  const equippedItem = equippedPet ? ITEMS.find(i => i.id === equippedPet) ?? null : null;
-  const coinMult = equippedItem?.ability.type === 'coin_boost' ? equippedItem.ability.value : 1;
-  const xpMult   = equippedItem?.ability.type === 'xp_boost'  ? equippedItem.ability.value : 1;
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const ttsLang = selectedCourse ? TTS_LANG[selectedCourse] : 'es-ES';
   const langName = selectedCourse ? LANG_NAME[selectedCourse] : 'Spanish';
@@ -266,6 +263,10 @@ export default function ConversationScreen() {
   const [mode] = useState<Mode>('silent');
   const [topic, setTopic] = useState<Topic | null>(null);
   const [ls, setLs] = useState<LessonState | null>(null);
+
+  // Pronunciation state
+  const [pronouncing, setPronouncing] = useState(false);
+  const [pronounceRating, setPronounceRating] = useState<{ label: string; color: string } | null>(null);
 
   // Chat state
   const [chatOpen, setChatOpen] = useState(false);
@@ -323,7 +324,7 @@ export default function ConversationScreen() {
     const newScore = correct ? ls.score + 1 : ls.score;
     setLs(prev => prev ? { ...prev, checked: true, correct, hearts: newHearts, score: newScore } : prev);
     const xpAmt = correct ? 20 : 5;
-    lessonCoinsRef.current += Math.round(Math.floor(xpAmt / 4) * coinMult);
+    lessonCoinsRef.current += Math.floor(xpAmt / 4);
     addXp(xpAmt);
 
     // Push AI feedback into chat
@@ -359,6 +360,7 @@ export default function ConversationScreen() {
       }
       return;
     }
+    setPronounceRating(null);
     const next = initExercise({ ...ls, idx: ls.idx + 1 });
     setLs(next);
     // Auto-focus input for type exercises
@@ -391,7 +393,7 @@ export default function ConversationScreen() {
     if (matched) {
       const newMatched = [...ls.pairsMatched, leftVal, rightVal];
       const allDone = newMatched.length === ex.wordPairs.length * 2;
-      if (allDone) { lessonCoinsRef.current += Math.round(Math.floor(30 / 4) * coinMult); addXp(30); }
+      if (allDone) { lessonCoinsRef.current += Math.floor(30 / 4); addXp(30); }
       setLs(prev => prev ? {
         ...prev,
         pairsMatched: newMatched,
@@ -410,7 +412,7 @@ export default function ConversationScreen() {
     const q = quiz.questions[quiz.idx];
     const correct = quiz.selected === q.correct;
     const newScore = correct ? quiz.score + 1 : quiz.score;
-    if (correct) lessonCoinsRef.current += Math.round(Math.floor(15 / 4) * coinMult);
+    if (correct) lessonCoinsRef.current += Math.floor(15 / 4);
     addXp(correct ? 15 : 0);
     setQuiz(prev => prev ? { ...prev, checked: true, correct, score: newScore } : prev);
   }, [quiz, addXp]);
@@ -491,6 +493,48 @@ export default function ConversationScreen() {
     });
     setChatLoading(false);
   }, [ex, langName]);
+
+  // ── pronunciation tap ─────────────────────────────────────────────────────────
+  const handlePronounce = useCallback((targetWord: string) => {
+    const SpeechRecognition = (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition
+      || (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setPronounceRating({ label: 'Speech not supported in this browser', color: '#888' });
+      return;
+    }
+    setPronouncing(true);
+    setPronounceRating(null);
+    // Speak the word first so user knows what to say
+    speakWord(targetWord, ttsLang);
+    setTimeout(() => {
+      const rec = new (SpeechRecognition as new () => SpeechRecognition)();
+      rec.lang = ttsLang;
+      rec.interimResults = false;
+      rec.maxAlternatives = 3;
+      rec.onresult = (e: SpeechRecognitionEvent) => {
+        const heard = e.results[0][0].transcript.trim().toLowerCase();
+        const target = targetWord.toLowerCase();
+        const confidence = e.results[0][0].confidence;
+        // Simple similarity: check if heard matches or is close
+        const normalize = (s: string) => s.replace(/[^\w\s]/g, '').trim();
+        const match = normalize(heard) === normalize(target);
+        const partial = normalize(target).includes(normalize(heard)) || normalize(heard).includes(normalize(target));
+        let rating: { label: string; color: string };
+        if (match || (confidence > 0.85 && partial)) {
+          rating = { label: '✅ Perfect!', color: 'var(--emerald, #22c55e)' };
+        } else if (partial || confidence > 0.6) {
+          rating = { label: '🟡 Close — keep practicing', color: '#f59e0b' };
+        } else {
+          rating = { label: '🔴 Try again — listen first', color: '#ef4444' };
+        }
+        setPronounceRating(rating);
+        setPronouncing(false);
+      };
+      rec.onerror = () => { setPronounceRating({ label: '❌ Mic error — check permissions', color: '#888' }); setPronouncing(false); };
+      rec.onnomatch = () => { setPronounceRating({ label: "Couldn't hear that — try again", color: '#888' }); setPronouncing(false); };
+      rec.start();
+    }, 800);
+  }, [ttsLang]);
 
   // ── keyboard shortcut ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -636,7 +680,7 @@ export default function ConversationScreen() {
     const hearts = ls ? ls.hearts : 0;
     const pct100 = Math.round((score / totalEx) * 100);
     const coinsFromAnswers = lessonCoinsRef.current;
-    const completionBonus = Math.round(50 * coinMult);
+    const completionBonus = 50;
     const totalCoins = coinsFromAnswers + completionBonus;
     return (
       <div className="conv-screen">
@@ -661,18 +705,6 @@ export default function ConversationScreen() {
               <span className="results-coin-label">Lesson complete bonus</span>
               <span className="results-coin-val">+{completionBonus}</span>
             </div>
-            {coinMult > 1 && equippedItem && (
-              <div className="results-coin-row results-coin-row--boost">
-                <span className="results-coin-label">{equippedItem.emoji} {equippedItem.name} boost</span>
-                <span className="results-coin-val results-coin-boost">{equippedItem.ability.label}</span>
-              </div>
-            )}
-            {xpMult > 1 && equippedItem && (
-              <div className="results-coin-row results-coin-row--boost">
-                <span className="results-coin-label">{equippedItem.emoji} {equippedItem.name} boost</span>
-                <span className="results-coin-val results-coin-boost">{equippedItem.ability.label}</span>
-              </div>
-            )}
             <div className="results-coin-total">
               <span>Total</span>
               <span className="results-coin-total-val">🪙 {totalCoins}</span>
@@ -737,6 +769,21 @@ export default function ConversationScreen() {
               <div className="dl-prompt-card">
                 <div className="dl-prompt-word">{ex.prompt}</div>
                 {ex.promptSub && <div className="dl-prompt-hint">{ex.promptSub}</div>}
+                {showReadings && (ex.word?.reading || ex.word?.hint) && (
+                  <div className="dl-prompt-reading">{ex.word.reading ?? ex.word.hint}</div>
+                )}
+                <button
+                  className={`dl-speak-btn ${pronouncing ? 'dl-speak-btn--active' : ''}`}
+                  onClick={() => handlePronounce(ex.word?.target ?? ex.prompt)}
+                  title="Tap to practice pronunciation"
+                >
+                  {pronouncing ? '🎙️ Listening…' : '🎤 Speak'}
+                </button>
+                {pronounceRating && (
+                  <div className="dl-pronounce-rating" style={{ color: pronounceRating.color }}>
+                    {pronounceRating.label}
+                  </div>
+                )}
               </div>
               <div className="dl-options">
                 {ex.options.map((opt, i) => (
@@ -758,6 +805,9 @@ export default function ConversationScreen() {
             <>
               <div className="dl-prompt-card">
                 <div className="dl-prompt-word">{ex.prompt}</div>
+                {showReadings && (ex.word?.reading || ex.word?.hint) && (
+                  <div className="dl-prompt-reading">{ex.word.reading ?? ex.word.hint}</div>
+                )}
               </div>
               <div className="dl-type-area">
                 <input

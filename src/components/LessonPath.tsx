@@ -3,7 +3,6 @@ import { LESSON_UNITS, FLAT_LESSONS, type UnitDef, type LessonDef } from '../dat
 import type { CustomUnit } from '../store/useAppStore';
 import { COURSES } from '../data';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
-import { ITEMS } from '../data/shop';
 import Avatar from './Avatar';
 
 const LANG_NAME: Record<string, string> = {
@@ -11,8 +10,7 @@ const LANG_NAME: Record<string, string> = {
 };
 
 export default function LessonPath() {
-  const { selectedCourse, completedLessons, xp, streak, coins, equippedPet, customLessons, customGoal, startLesson, goBack, logout, openShop, openProfile, openOnboarding } = useAppStore();
-  const equippedItem = equippedPet ? ITEMS.find(i => i.id === equippedPet) : null;
+  const { selectedCourse, completedLessons, xp, streak, coins, customLessons, customGoal, startLesson, goBack, logout, openProfile, openOnboarding } = useAppStore();
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const langName = selectedCourse ? (LANG_NAME[selectedCourse] ?? 'Unknown') : '';
   const done = selectedCourse ? (completedLessons[selectedCourse] ?? []) : [];
@@ -47,13 +45,10 @@ export default function LessonPath() {
         {/* Row 2: action buttons */}
         <div className="path-topbar-actions">
           <button className="path-profile-btn" onClick={openProfile}>
-            {equippedItem
-              ? <span className="path-profile-btn-pet">{equippedItem.emoji}</span>
-              : <Avatar avatarId={level.avatarId} color={level.color} size={22} />
-            }
+            <Avatar avatarId={level.avatarId} color={level.color} size={22} />
             <div className="path-profile-btn-info">
               <span className="path-profile-btn-title" style={{ color: level.color }}>
-                {equippedItem ? equippedItem.name : level.title}
+                {level.title}
               </span>
               <div className="path-level-bar-wrap">
                 <div className="path-level-bar-fill" style={{ width: `${pct}%`, background: level.color }} />
@@ -63,7 +58,7 @@ export default function LessonPath() {
           </button>
           <div className="path-topbar-pills">
             <span className="path-pill path-pill--streak">🔥 {streak}</span>
-            <button className="path-pill path-pill--shop" onClick={openShop}>🛍️ Shop · 🪙{coins.toLocaleString()}</button>
+            <span className="path-pill path-pill--coins">🪙 {coins.toLocaleString()}</span>
           </div>
         </div>
       </div>

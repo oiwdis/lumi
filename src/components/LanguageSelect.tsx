@@ -3,8 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import type { CourseId } from '../types';
 
 export default function LanguageSelect() {
-  const openOnboarding = useAppStore(s => s.openOnboarding);
-  const logout = useAppStore(s => s.logout);
+  const { openOnboarding, setCourse, customGoal, logout } = useAppStore();
 
   return (
     <div className="select-screen">
@@ -25,7 +24,7 @@ export default function LanguageSelect() {
             key={c.id}
             className="course-card"
             style={{ '--accent': c.color } as React.CSSProperties}
-            onClick={() => openOnboarding(c.id as CourseId)}
+            onClick={() => customGoal[c.id] ? setCourse(c.id as CourseId) : openOnboarding(c.id as CourseId)}
           >
             <div className="course-flags">
               <span>{c.fromFlag}</span>
