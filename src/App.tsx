@@ -5,6 +5,7 @@ import LessonPath from './components/LessonPath';
 import ConversationScreen from './components/ConversationScreen';
 import ShopScreen from './components/ShopScreen';
 import ProfileScreen from './components/ProfileScreen';
+import OnboardingChat from './components/OnboardingChat';
 import './App.css';
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
     <div className="app">
       {screen === 'login' && <LoginScreen onAuth={login} />}
       {screen === 'select' && <LanguageSelect />}
+      {screen === 'onboarding' && <OnboardingChat />}
       {screen === 'path' && <LessonPath />}
       {screen === 'chat' && <ConversationScreen />}
       {screen === 'shop' && <ShopScreen />}

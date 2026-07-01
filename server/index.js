@@ -98,6 +98,68 @@ app.post('/api/tutor', async (req, res) => {
   }
 });
 
+// AI lesson customization
+app.post('/api/customize', async (req, res) => {
+  const { courseId, language, goal } = req.body;
+  if (!goal || !language) return res.status(400).json({ error: 'goal and language required' });
+
+  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'AI not configured' });
+
+  const COLORS = ['#58CC02','#1CB0F6','#FF9600','#CE82FF','#FF4B4B','#00C4CC'];
+
+  const systemPrompt = `You are a language curriculum designer. Given a learner's goal, create a highly practical, personalized ${language} lesson plan. Return ONLY valid JSON matching this exact schema, no markdown, no explanation:
+
+{
+  "units": [
+    {
+      "id": "u1",
+      "title": "Unit 1",
+      "subtitle": "short theme label",
+      "emoji": "single emoji",
+      "color": "#hex",
+      "lessons": [
+        {
+          "id": "unique-kebab-id",
+          "title": "Lesson Title",
+          "emoji": "single emoji",
+          "words": [
+            { "english": "phrase in English", "target": "phrase in ${language}" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+Rules:
+- Create 4–5 units, each with 3–4 lessons
+- Each lesson has 5–8 word/phrase pairs
+- Phrases should be practical, full sentences or short phrases the learner will actually use
+- Tailor everything tightly to the learner's stated goal — no generic vocabulary
+- Unit colors must come from this list: ${COLORS.join(', ')}
+- All target language text must be accurate ${language}
+- Keep lesson titles short (2–3 words)`;
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 4000,
+      thinking: { type: 'adaptive' },
+      system: systemPrompt,
+      messages: [{ role: 'user', content: `Course: ${courseId}\nLearner's goal: ${goal}` }],
+    });
+
+    const text = response.content.find(b => b.type === 'text')?.text ?? '';
+    // Extract JSON from response (strip any accidental markdown)
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return res.status(500).json({ error: 'AI returned invalid JSON' });
+    const plan = JSON.parse(jsonMatch[0]);
+    res.json(plan);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Serve built frontend in production
 if (process.env.NODE_ENV === 'production') {
   const distPath = join(__dirname, '../dist');

@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import type { CourseId } from '../types';
 
 export default function LanguageSelect() {
-  const setCourse = useAppStore(s => s.setCourse);
+  const openOnboarding = useAppStore(s => s.openOnboarding);
   const logout = useAppStore(s => s.logout);
 
   return (
@@ -25,7 +25,7 @@ export default function LanguageSelect() {
             key={c.id}
             className="course-card"
             style={{ '--accent': c.color } as React.CSSProperties}
-            onClick={() => setCourse(c.id as CourseId)}
+            onClick={() => openOnboarding(c.id as CourseId)}
           >
             <div className="course-flags">
               <span>{c.fromFlag}</span>

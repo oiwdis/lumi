@@ -235,7 +235,7 @@ async function fetchAIResponse(
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function ConversationScreen() {
-  const { selectedCourse, currentLessonId, user, xp, streak, equippedPet, addXp, goBack, completeLesson, logout } = useAppStore();
+  const { selectedCourse, currentLessonId, user, xp, streak, equippedPet, customLessons, addXp, goBack, completeLesson, logout } = useAppStore();
   const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja';
 
   // Track coins earned during this lesson session
@@ -246,11 +246,18 @@ export default function ConversationScreen() {
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const ttsLang = selectedCourse ? TTS_LANG[selectedCourse] : 'es-ES';
   const langName = selectedCourse ? LANG_NAME[selectedCourse] : 'Spanish';
-  const topics = selectedCourse ? (TOPICS[selectedCourse] ?? []) : [];
+  const staticTopics = selectedCourse ? (TOPICS[selectedCourse] ?? []) : [];
 
-  // Look up the current lesson's topic
-  const currentTopic = currentLessonId
-    ? topics.find(t => t.id === currentLessonId) ?? null
+  // Build a unified topic list: custom lessons take priority over static topics
+  const customUnits = selectedCourse ? (customLessons[selectedCourse] ?? null) : null;
+  const topics: Topic[] = customUnits
+    ? customUnits.flatMap(u => u.lessons.map(l => ({ id: l.id, emoji: l.emoji ?? '📚', title: l.title, words: l.words })))
+    : staticTopics;
+
+  // Look up the current lesson's topic (custom lessons use their id directly, static use topicId)
+  const effectiveLessonId = currentLessonId?.startsWith('custom:') ? currentLessonId.replace('custom:', '') : currentLessonId;
+  const currentTopic = effectiveLessonId
+    ? topics.find(t => t.id === effectiveLessonId) ?? null
     : null;
 
   const [screen, setScreen] = useState<'lesson' | 'quiz' | 'results'>('lesson');

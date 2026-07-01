@@ -26,7 +26,11 @@ function saveProgress(userId: string, p: UserProgress) {
   localStorage.setItem(`lumi-progress-${userId}`, JSON.stringify(p));
 }
 
-type Screen = 'login' | 'select' | 'path' | 'chat' | 'shop' | 'profile';
+type Screen = 'login' | 'select' | 'onboarding' | 'path' | 'chat' | 'shop' | 'profile';
+
+export interface CustomWord { english: string; target: string; hint?: string; }
+export interface CustomLesson { id: string; title: string; emoji: string; words: CustomWord[]; }
+export interface CustomUnit { id: string; title: string; subtitle: string; emoji: string; color: string; lessons: CustomLesson[]; }
 
 interface AuthUser { id: string; name: string; email: string; }
 
@@ -42,6 +46,8 @@ interface AppStore {
   coins: number;
   inventory: Record<string, number>;
   equippedPet: string | null;
+  customLessons: Record<string, CustomUnit[]>;
+  customGoal: Record<string, string>;
 
   login: (user: AuthUser) => void;
   logout: () => void;
@@ -55,6 +61,9 @@ interface AppStore {
   addToInventory: (items: ShopItem[]) => void;
   openShop: () => void;
   openProfile: () => void;
+  openOnboarding: (c: CourseId) => void;
+  setCustomLessons: (courseId: string, units: CustomUnit[], goal: string) => void;
+  skipOnboarding: () => void;
   sellItem: (itemId: string, rarity: Rarity) => void;
   equipPet: (itemId: string | null) => void;
   resetProgress: () => void;
@@ -96,6 +105,8 @@ export const useAppStore = create<AppStore>()(
       coins: 0,
       inventory: {},
       equippedPet: null,
+      customLessons: {},
+      customGoal: {},
 
       login: (user) => {
         const progress = loadProgress(user.id);
@@ -121,6 +132,12 @@ export const useAppStore = create<AppStore>()(
       },
 
       setCourse: (c) => set({ selectedCourse: c, screen: 'path' }),
+      openOnboarding: (c) => set({ selectedCourse: c, screen: 'onboarding' }),
+      skipOnboarding: () => set({ screen: 'path' }),
+      setCustomLessons: (courseId, units, goal) => {
+        const s = get();
+        set({ customLessons: { ...s.customLessons, [courseId]: units }, customGoal: { ...s.customGoal, [courseId]: goal }, screen: 'path' });
+      },
       startLesson: (lessonId) => set({ currentLessonId: lessonId, screen: 'chat' }),
       openShop: () => set({ screen: 'shop' }),
       openProfile: () => set({ screen: 'profile' }),
@@ -144,6 +161,7 @@ export const useAppStore = create<AppStore>()(
 
       goBack: () => {
         const { screen } = get();
+        if (screen === 'onboarding') set({ screen: 'select', selectedCourse: null });
         if (screen === 'path') set({ screen: 'select', selectedCourse: null });
         if (screen === 'chat') set({ screen: 'path', currentLessonId: null });
         if (screen === 'shop') set({ screen: 'path' });

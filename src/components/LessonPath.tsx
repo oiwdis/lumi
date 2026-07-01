@@ -1,5 +1,6 @@
 import { useAppStore } from '../store/useAppStore';
-import { LESSON_UNITS, FLAT_LESSONS } from '../data/lessonPath';
+import { LESSON_UNITS, FLAT_LESSONS, type UnitDef, type LessonDef } from '../data/lessonPath';
+import type { CustomUnit } from '../store/useAppStore';
 import { COURSES } from '../data';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
 import { ITEMS } from '../data/shop';
@@ -10,7 +11,7 @@ const LANG_NAME: Record<string, string> = {
 };
 
 export default function LessonPath() {
-  const { selectedCourse, completedLessons, xp, streak, coins, equippedPet, startLesson, goBack, logout, openShop, openProfile } = useAppStore();
+  const { selectedCourse, completedLessons, xp, streak, coins, equippedPet, customLessons, customGoal, startLesson, goBack, logout, openShop, openProfile, openOnboarding } = useAppStore();
   const equippedItem = equippedPet ? ITEMS.find(i => i.id === equippedPet) : null;
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const langName = selectedCourse ? (LANG_NAME[selectedCourse] ?? 'Unknown') : '';
@@ -18,7 +19,15 @@ export default function LessonPath() {
   const level = getLevelForXp(xp);
   const { pct } = xpProgressInLevel(xp);
 
-  const currentIdx = FLAT_LESSONS.findIndex(l => !done.includes(l.id));
+  // Use AI-generated custom lessons if available, otherwise fall back to defaults
+  const activeCustom: CustomUnit[] | null = selectedCourse ? (customLessons[selectedCourse] ?? null) : null;
+  const activeUnits: UnitDef[] | CustomUnit[] = activeCustom ?? LESSON_UNITS;
+  const activeFlatLessons: LessonDef[] = activeCustom
+    ? activeCustom.flatMap(u => u.lessons.map(l => ({ id: l.id, title: l.title, emoji: l.emoji, topicId: `custom:${l.id}`, xpReward: 20 })))
+    : FLAT_LESSONS;
+
+  const currentIdx = activeFlatLessons.findIndex(l => !done.includes(l.id));
+  const currentGoal = selectedCourse ? (customGoal[selectedCourse] ?? null) : null;
 
   let flatIdx = 0;
 
@@ -61,7 +70,19 @@ export default function LessonPath() {
 
       {/* Lesson grid */}
       <div className="path-scroll">
-        {LESSON_UNITS.map(unit => {
+        {/* Personalization banner */}
+        {currentGoal && (
+          <div className="path-goal-banner">
+            <span className="path-goal-icon">✨</span>
+            <div className="path-goal-text">
+              <span className="path-goal-label">Personalized for you</span>
+              <span className="path-goal-desc">"{currentGoal}"</span>
+            </div>
+            <button className="path-goal-edit" onClick={() => selectedCourse && openOnboarding(selectedCourse)} title="Change goal">✏️</button>
+          </div>
+        )}
+
+        {activeUnits.map(unit => {
           const unitStart = flatIdx;
           const unitLessons = unit.lessons.map((lesson, lessonIdx) => {
             const fi = unitStart + lessonIdx;
@@ -78,7 +99,6 @@ export default function LessonPath() {
 
           return (
             <div key={unit.id} className="path-unit">
-              {/* Chapter header */}
               <div className="path-chapter-header" style={{ borderColor: unit.color }}>
                 <div className="path-chapter-left">
                   <span className="path-chapter-emoji" style={{ background: unit.color }}>{unit.emoji}</span>
@@ -92,7 +112,6 @@ export default function LessonPath() {
                 </div>
               </div>
 
-              {/* 2-column card grid */}
               <div className="path-card-grid">
                 {unitLessons.map(({ lesson, isCompleted, isCurrent, isLocked }) => (
                   <button
@@ -117,8 +136,8 @@ export default function LessonPath() {
           <div className="path-complete">
             <div className="path-complete-icon">🏆</div>
             <h2>Course complete!</h2>
-            <p>You've mastered all {FLAT_LESSONS.length} lessons in {langName}.</p>
-            <button className="path-replay-btn" onClick={() => startLesson(FLAT_LESSONS[0].id)}>
+            <p>You've mastered all {activeFlatLessons.length} lessons in {langName}.</p>
+            <button className="path-replay-btn" onClick={() => startLesson(activeFlatLessons[0].id)}>
               Start over →
             </button>
           </div>
