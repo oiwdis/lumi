@@ -1035,7 +1035,7 @@ input { font-family: inherit; }
   padding: 36px 28px;
   text-align: center;
   width: 100%;
-  max-width: 360px;
+  max-width: min(480px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2986,8 +2986,8 @@ input { font-family: inherit; }
   position: fixed;
   bottom: 158px;
   right: 16px;
-  width: 360px;
-  max-height: 520px;
+  width: min(480px, calc(100vw - 24px));
+  max-height: min(680px, calc(100vh - 180px));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -3264,7 +3264,7 @@ input { font-family: inherit; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .shop-reveal-panel {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 24px; padding: 28px 20px; width: 100%; max-width: 360px;
+  border-radius: 24px; padding: 28px 20px; width: 100%; max-width: min(480px, calc(100vw - 24px));
   display: flex; flex-direction: column; align-items: center; gap: 20px;
 }
 .shop-reveal-title { font-size: 22px; font-weight: 900; color: var(--text); }
