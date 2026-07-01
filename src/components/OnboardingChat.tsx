@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { COURSES } from '../data';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 const LANG_GREETING: Record<string, string> = {
   'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese',
@@ -25,7 +24,7 @@ export default function OnboardingChat() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/api/customize`, {
+      const res = await fetch('/api/customize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ courseId: selectedCourse, language: lang, goal: input.trim() }),
