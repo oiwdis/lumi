@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { COURSES } from '../data';
 import { TOPICS, type Topic, type Word } from '../data/lessonWords';
+import { LESSON_UNITS } from '../data/lessonPath';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
 import Avatar from './Avatar';
 import AIChat, { type ChatMessage } from './AIChat';
@@ -191,6 +192,21 @@ function initExercise(ls: LessonState): LessonState {
   return { ...ls, selected: null, typed: '', checked: false, correct: null, pairsLeft, pairsRight, pairsSelected: null, pairsMatched: [], pairsWrong: null, flashIdx: 0 };
 }
 
+function buildUnitQuiz(unitWords: Word[], pool: Word[], langName: string): QuizState {
+  const selected = shuffle(unitWords).slice(0, 10);
+  const questions: MCExercise[] = selected.map(word => {
+    const recognize = Math.random() > 0.5;
+    if (recognize) {
+      const opts = shuffle([word.english, ...distractors(word, pool, 'english')]);
+      return { kind: 'mc' as const, instruction: `What does "${word.target}" mean?`, prompt: word.target, promptSub: word.hint, options: opts, correct: opts.indexOf(word.english), word };
+    } else {
+      const opts = shuffle([word.target, ...distractors(word, pool, 'target')]);
+      return { kind: 'mc' as const, instruction: `How do you say "${word.english}"?`, prompt: word.english, options: opts, correct: opts.indexOf(word.target), word };
+    }
+  });
+  return { questions, idx: 0, score: 0, selected: null, checked: false, correct: null };
+}
+
 function buildQuiz(topic: Topic, pool: Word[], langName: string): QuizState {
   const words = topic.words;
   const questions: MCExercise[] = [];
@@ -263,9 +279,23 @@ export default function ConversationScreen() {
     ? topics.find(t => t.id === effectiveLessonId) ?? null
     : null;
 
-  const [screen, setScreen] = useState<'lesson' | 'quiz' | 'results'>('lesson');
+  const rawUnits = customUnits
+    ? customUnits
+    : (LESSON_UNITS as Array<{ id: string; lessons: Array<{ id: string }> }>);
+  const currentUnit = effectiveLessonId
+    ? rawUnits.find(u => u.lessons.some((l: { id: string }) => l.id === effectiveLessonId)) ?? null
+    : null;
+  const isLastInUnit = currentUnit != null
+    && currentUnit.lessons[currentUnit.lessons.length - 1].id === effectiveLessonId;
+  const unitWords: Word[] = customUnits && currentUnit
+    ? (currentUnit as typeof customUnits[number]).lessons.flatMap(l => l.words ?? [])
+    : (currentTopic?.words ?? []);
+
+  const [screen, setScreen] = useState<'lesson' | 'quiz' | 'results' | 'unit-quiz' | 'unit-results'>('lesson');
   const [quiz, setQuiz] = useState<QuizState | null>(null);
   const [quizScore, setQuizScore] = useState(0);
+  const [unitQuiz, setUnitQuiz] = useState<QuizState | null>(null);
+  const [unitQuizScore, setUnitQuizScore] = useState(0);
   const [mode] = useState<Mode>('silent');
   const [topic, setTopic] = useState<Topic | null>(null);
   const [ls, setLs] = useState<LessonState | null>(null);
@@ -693,6 +723,92 @@ export default function ConversationScreen() {
     );
   }
 
+  // UNIT QUIZ
+  if (screen === 'unit-quiz') {
+    if (!unitQuiz) { completeLesson(); return null; }
+    const qex = unitQuiz.questions[unitQuiz.idx];
+    const canCheck = !unitQuiz.checked && unitQuiz.selected !== null;
+    const isLastQ = unitQuiz.idx >= unitQuiz.questions.length - 1;
+    return (
+      <div className="conv-screen">
+        <TopBar onBack={completeLesson} />
+        <div className="quiz-header">
+          <span className="quiz-badge" style={{ background: 'var(--amber)' }}>🏆 Unit Quiz!</span>
+          <div className="dl-progress-track">
+            {Array.from({ length: unitQuiz.questions.length }).map((_, i) => (
+              <div key={i} className={`seg ${i < unitQuiz.idx ? 'filled' : ''}`} style={i < unitQuiz.idx ? { background: 'var(--amber)' } : undefined} />
+            ))}
+          </div>
+          <span className="quiz-counter">{unitQuiz.idx + 1}/{unitQuiz.questions.length}</span>
+        </div>
+        <div className="dl-exercise-area">
+          <p className="dl-instruction">{qex.instruction}</p>
+          <div className="dl-prompt-card">
+            <div className="dl-prompt-word">{qex.prompt}</div>
+            {qex.promptSub && <div className="dl-prompt-hint">{qex.promptSub}</div>}
+          </div>
+          <div className="dl-options">
+            {qex.options.map((opt, i) => (
+              <button key={i}
+                className={`dl-option ${unitQuiz.selected === i ? 'selected' : ''} ${unitQuiz.checked && i === qex.correct ? 'correct' : ''} ${unitQuiz.checked && unitQuiz.selected === i && i !== qex.correct ? 'wrong' : ''}`}
+                onClick={() => !unitQuiz.checked && setUnitQuiz(prev => prev ? { ...prev, selected: i } : prev)}
+                disabled={unitQuiz.checked}
+              >{opt}</button>
+            ))}
+          </div>
+        </div>
+        {unitQuiz.checked && (
+          <div className={`dl-feedback-banner ${unitQuiz.correct ? 'correct' : 'wrong'}`}>
+            <div className="dl-feedback-inner">
+              <Avatar avatarId="seedling" color={unitQuiz.correct ? '#7ecf6e' : '#FF4B4B'} size={36} />
+              <span>{unitQuiz.correct ? '✓ Correct!' : `✗ The answer is "${qex.options[qex.correct]}"`}</span>
+            </div>
+          </div>
+        )}
+        <div className={`dl-footer ${unitQuiz.checked ? (unitQuiz.correct ? 'correct' : 'wrong') : ''}`}>
+          {unitQuiz.checked ? (
+            <button className="dl-continue-btn" onClick={() => {
+              if (isLastQ) {
+                setUnitQuizScore(unitQuiz.score);
+                setScreen('unit-results');
+              } else {
+                setUnitQuiz(prev => prev ? { ...prev, idx: prev.idx + 1, selected: null, checked: false, correct: null } : prev);
+              }
+            }}>{isLastQ ? 'See results →' : 'Next →'}</button>
+          ) : (
+            <button className="dl-check-btn" onClick={() => {
+              if (!unitQuiz || unitQuiz.selected === null) return;
+              const correct = unitQuiz.selected === unitQuiz.questions[unitQuiz.idx].correct;
+              setUnitQuiz(prev => prev ? { ...prev, checked: true, correct, score: correct ? prev.score + 1 : prev.score } : prev);
+              addXp(correct ? 15 : 3);
+            }} disabled={!canCheck}>Check</button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // UNIT RESULTS
+  if (screen === 'unit-results') {
+    const total = unitQuiz?.questions.length ?? 0;
+    const pct = total > 0 ? Math.round((unitQuizScore / total) * 100) : 0;
+    return (
+      <div className="conv-screen">
+        <TopBar onBack={completeLesson} />
+        <div className="results-screen dl-results">
+          <div className="dl-results-icon">{pct === 100 ? '🏆' : pct >= 60 ? '⭐' : '💪'}</div>
+          <h2 className="dl-results-title">Unit Complete!</h2>
+          <p style={{ color: 'var(--muted)', marginBottom: 16, textAlign: 'center' }}>You scored {unitQuizScore}/{total} on the unit quiz</p>
+          <div className="dl-results-stats">
+            <div className="dl-stat"><span className="dl-stat-num">{unitQuizScore}/{total}</span><span className="dl-stat-lbl">Unit Quiz</span></div>
+            <div className="dl-stat"><span className="dl-stat-num">{pct}%</span><span className="dl-stat-lbl">Score</span></div>
+          </div>
+          <button className="dl-continue-btn" style={{ marginTop: 24 }} onClick={completeLesson}>Back to lessons →</button>
+        </div>
+      </div>
+    );
+  }
+
   // RESULTS
   if (screen === 'results') {
     const totalEx = ls ? ls.exercises.filter(e => e.kind !== 'pairs').length : 1;
@@ -741,8 +857,17 @@ export default function ConversationScreen() {
               ))}
             </div>
           )}
-          <button className="dl-continue-btn" onClick={completeLesson}>
-            {pct100 >= 60 ? 'Continue →' : 'Back to path →'}
+          <button className="dl-continue-btn" onClick={() => {
+            if (isLastInUnit && unitWords.length >= 4) {
+              const q = buildUnitQuiz(unitWords, allWords, langName);
+              setUnitQuiz(q);
+              setUnitQuizScore(0);
+              setScreen('unit-quiz');
+            } else {
+              completeLesson();
+            }
+          }}>
+            {isLastInUnit && unitWords.length >= 4 ? 'Unit Quiz →' : (pct100 >= 60 ? 'Continue →' : 'Back to path →')}
           </button>
           {topic && ls && (
             <button className="conv-back-link" onClick={() => handleStartLesson(topic, mode)}>Practice again</button>
