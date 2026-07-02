@@ -87,6 +87,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve the built Vite frontend in production
+const distPath = join(__dirname, '../dist');
+if (existsSync(distPath)) {
+  app.use(express.static(distPath));
+}
+
 // Signup
 app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password } = req.body;
@@ -287,6 +293,11 @@ Rules:
     res.status(500).json({ error: err.message });
   }
 });
+
+// Fall through to index.html for any non-API route (SPA)
+if (existsSync(distPath)) {
+  app.get('*', (_req, res) => res.sendFile(join(distPath, 'index.html')));
+}
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
