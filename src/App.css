@@ -2645,6 +2645,77 @@ input { font-family: inherit; }
 .dl-hear-btn:hover { color: var(--lumi); border-color: var(--lumi); }
 
 /* Pairs */
+/* ── Flash cards ── */
+.flash-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+.flash-dots {
+  display: flex;
+  gap: 6px;
+}
+.flash-dot {
+  width: 8px; height: 8px;
+  border-radius: 99px;
+  background: var(--border);
+  transition: background 0.2s, width 0.2s;
+}
+.flash-dot--active { background: var(--lumi); width: 20px; }
+.flash-dot--done { background: var(--lumi); opacity: 0.4; }
+.flash-card {
+  width: 100%;
+  max-width: 340px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 32px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.flash-target {
+  font-size: 38px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+.flash-reading {
+  font-size: 16px;
+  color: var(--lumi);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.flash-divider {
+  width: 40px; height: 2px;
+  background: var(--border);
+  border-radius: 99px;
+  margin: 4px 0;
+}
+.flash-english {
+  font-size: 18px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.flash-speak-btn {
+  margin-top: 8px;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  font-size: 22px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.flash-speak-btn:hover { background: var(--surface); border-color: var(--lumi); transform: scale(1.08); }
+.flash-speak-btn:active { transform: scale(0.95); }
+
 .dl-pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 340px; }
 .dl-pairs-col { display: flex; flex-direction: column; gap: 10px; }
 .dl-pair-btn {

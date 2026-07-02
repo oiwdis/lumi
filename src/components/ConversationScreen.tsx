@@ -39,7 +39,11 @@ interface PairsExercise {
   instruction: string;
   wordPairs: Array<{ target: string; english: string }>;
 }
-type Exercise = MCExercise | TypeExercise | PairsExercise;
+interface FlashExercise {
+  kind: 'flash';
+  words: Word[];
+}
+type Exercise = MCExercise | TypeExercise | PairsExercise | FlashExercise;
 
 // ── exercise generator ────────────────────────────────────────────────────────
 
@@ -60,13 +64,12 @@ function buildExercises(topic: Topic, pool: Word[], langName: string): Exercise[
   const words = topic.words;
   const ex: Exercise[] = [];
 
-  // Pairs exercise (intro — always first)
+  // Flashcard intro — always first
+  ex.push({ kind: 'flash', words });
+
+  // Pairs exercise — second
   const pairWords = shuffle(words).slice(0, 4);
-  ex.push({
-    kind: 'pairs',
-    instruction: 'Tap the matching pairs',
-    wordPairs: pairWords,
-  });
+  ex.push({ kind: 'pairs', instruction: 'Tap the matching pairs', wordPairs: pairWords });
 
   // Multiple choice: recognize (target → English)
   for (const word of shuffle(words)) {
@@ -107,8 +110,8 @@ function buildExercises(topic: Topic, pool: Word[], langName: string): Exercise[
     });
   }
 
-  // Shuffle everything except first pairs exercise
-  return [ex[0], ...shuffle(ex.slice(1))];
+  // Keep flash + pairs first, shuffle the rest
+  return [ex[0], ex[1], ...shuffle(ex.slice(2))];
 }
 
 // ── answer normalization ──────────────────────────────────────────────────────
@@ -155,6 +158,8 @@ interface LessonState {
   pairsSelected: { side: 'left' | 'right'; value: string } | null;
   pairsMatched: string[];        // matched left values
   pairsWrong: string | null;     // briefly highlight wrong pair
+  // flash state
+  flashIdx: number;              // current card index in flash intro
 }
 
 function initLesson(topic: Topic, pool: Word[], langName: string): LessonState {
@@ -163,6 +168,7 @@ function initLesson(topic: Topic, pool: Word[], langName: string): LessonState {
     exercises, idx: 0, hearts: 3, score: 0,
     selected: null, typed: '', checked: false, correct: null,
     pairsLeft: [], pairsRight: [], pairsSelected: null, pairsMatched: [], pairsWrong: null,
+    flashIdx: 0,
   };
 }
 
@@ -182,7 +188,7 @@ function initExercise(ls: LessonState): LessonState {
     pairsLeft = shuffle(ex.wordPairs.map(w => w.target));
     pairsRight = shuffle(ex.wordPairs.map(w => w.english));
   }
-  return { ...ls, selected: null, typed: '', checked: false, correct: null, pairsLeft, pairsRight, pairsSelected: null, pairsMatched: [], pairsWrong: null };
+  return { ...ls, selected: null, typed: '', checked: false, correct: null, pairsLeft, pairsRight, pairsSelected: null, pairsMatched: [], pairsWrong: null, flashIdx: 0 };
 }
 
 function buildQuiz(topic: Topic, pool: Word[], langName: string): QuizState {
@@ -872,6 +878,44 @@ export default function ConversationScreen() {
             </>
           )}
 
+          {/* ── FLASH CARDS ── */}
+          {ex.kind === 'flash' && (() => {
+            const card = ex.words[ls.flashIdx];
+            const reading = showReadings ? (card.reading ?? card.hint) : undefined;
+            const isLast = ls.flashIdx >= ex.words.length - 1;
+            return (
+              <div className="flash-wrap">
+                <div className="flash-dots">
+                  {ex.words.map((_, i) => (
+                    <span key={i} className={`flash-dot ${i === ls.flashIdx ? 'flash-dot--active' : i < ls.flashIdx ? 'flash-dot--done' : ''}`} />
+                  ))}
+                </div>
+                <div className="flash-card">
+                  <div className="flash-target">{card.target}</div>
+                  {reading && <div className="flash-reading">{reading}</div>}
+                  <div className="flash-divider" />
+                  <div className="flash-english">{card.english}</div>
+                  <button className="flash-speak-btn" onClick={() => speakWord(card.target, ttsLang)} title="Hear pronunciation">
+                    🔊
+                  </button>
+                </div>
+                <button
+                  className="dl-continue-btn"
+                  style={{ marginTop: 8 }}
+                  onClick={() => {
+                    if (isLast) {
+                      handleContinue();
+                    } else {
+                      setLs(prev => prev ? { ...prev, flashIdx: prev.flashIdx + 1 } : prev);
+                    }
+                  }}
+                >
+                  {isLast ? 'Start lesson →' : 'Next →'}
+                </button>
+              </div>
+            );
+          })()}
+
           {/* ── PAIRS ── */}
           {ex.kind === 'pairs' && (
             <div className="dl-pairs">
@@ -906,9 +950,9 @@ export default function ConversationScreen() {
           )}
         </div>
 
-        {/* Footer button */}
+        {/* Footer button — hidden during flash (it has its own inline button) */}
         <div className="dl-footer">
-          {ls.checked ? (
+          {ex.kind === 'flash' ? null : ls.checked ? (
             <button className="dl-continue-btn" onClick={handleContinue}>
               {isLastExercise || ls.hearts === 0 ? 'See results →' : 'Continue →'}
             </button>
