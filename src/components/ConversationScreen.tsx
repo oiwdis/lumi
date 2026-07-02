@@ -470,7 +470,7 @@ export default function ConversationScreen() {
     const displayText = isPronunciation ? `🎤 "${text}"` : text;
     setChatMessages(prev => [...prev, { id: userMsgId, role: 'user', text: displayText }]);
 
-    const currentWord = ex && ex.kind !== 'pairs'
+    const currentWord = ex && ex.kind !== 'pairs' && ex.kind !== 'flash'
       ? { target: (ex as MCExercise | TypeExercise).word.target, english: (ex as MCExercise | TypeExercise).word.english }
       : undefined;
 
