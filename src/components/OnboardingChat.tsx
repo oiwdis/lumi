@@ -159,14 +159,12 @@ export default function OnboardingChat() {
   const course = COURSES.find(c => c.id === selectedCourse);
   const lang = selectedCourse ? (LANG_GREETING[selectedCourse] ?? 'this language') : 'this language';
 
-  const [step, setStep] = useState<'goal' | 'level'>('goal');
   const [input, setInput] = useState('');
-  const [level, setLevel] = useState<Level | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { if (step === 'goal') inputRef.current?.focus(); }, [step]);
+  useEffect(() => { inputRef.current?.focus(); }, []);
 
   const handleGenerate = async (chosenLevel: Level) => {
     if (!input.trim() || !selectedCourse) return;
@@ -188,18 +186,10 @@ export default function OnboardingChat() {
     }
   };
 
-  const handleGoalNext = () => {
-    if (input.trim()) setStep('level');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGoalNext(); }
-  };
-
   return (
     <div className="onboard-screen">
       <div className="onboard-topbar">
-        <button className="onboard-back" onClick={step === 'level' ? () => setStep('goal') : goBack}>←</button>
+        <button className="onboard-back" onClick={goBack}>←</button>
         <span className="onboard-flags">{course?.fromFlag} → {course?.toFlag}</span>
         <button className="onboard-skip" onClick={skipOnboarding}>Skip</button>
       </div>
@@ -215,70 +205,46 @@ export default function OnboardingChat() {
             </div>
             <LoadingGame lang={lang} />
           </>
-        ) : step === 'goal' ? (
-          /* ── Step 1: Why are you learning? ── */
+        ) : (
+          /* ── Single step: goal + level ── */
           <>
             <div className="onboard-ai-bubble">
               <div className="onboard-ai-avatar">🌱</div>
               <div className="onboard-ai-text">
                 <p>Hey! I'm Lumi, your AI language tutor. 👋</p>
-                <p>Before we dive into {lang}, tell me — <strong>why are you learning it?</strong></p>
-                <p>The more specific you are, the better I can tailor your lessons. For example:</p>
-                <ul>
-                  <li><em>"Moving to Mexico to work at a hotel"</em></li>
-                  <li><em>"Dating someone who speaks {lang}"</em></li>
-                  <li><em>"Traveling for 3 months in a {lang}-speaking country"</em></li>
-                </ul>
+                <p>Two quick questions and I'll build your personal {lang} curriculum:</p>
               </div>
             </div>
 
             <div className="onboard-input-wrap">
+              <label className="onboard-field-label">Why are you learning {lang}?</label>
               <textarea
                 ref={inputRef}
                 className="onboard-textarea"
-                placeholder={`Tell Lumi why you're learning ${lang}...`}
+                placeholder={`e.g. "Moving to Mexico for work", "Dating someone who speaks ${lang}"…`}
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
                 rows={3}
                 disabled={loading}
               />
-              {error && <div className="onboard-error">{error}</div>}
-              <button
-                className="onboard-btn"
-                onClick={handleGoalNext}
-                disabled={!input.trim()}
-              >
-                Next →
-              </button>
-            </div>
-          </>
-        ) : (
-          /* ── Step 2: Experience level ── */
-          <>
-            <div className="onboard-ai-bubble">
-              <div className="onboard-ai-avatar">🌱</div>
-              <div className="onboard-ai-text">
-                <p>Got it! One more thing — <strong>what's your current level in {lang}?</strong></p>
-                <p>This helps Lumi pitch the lessons at the right difficulty.</p>
-              </div>
-            </div>
 
-            <div className="onboard-level-grid">
-              {LEVELS.map(lv => (
-                <button
-                  key={lv.id}
-                  className={`onboard-level-btn ${level === lv.id ? 'onboard-level-btn--selected' : ''}`}
-                  onClick={() => {
-                    setLevel(lv.id);
-                    handleGenerate(lv.id);
-                  }}
-                >
-                  <span className="onboard-level-emoji">{lv.emoji}</span>
-                  <span className="onboard-level-label">{lv.label}</span>
-                  <span className="onboard-level-desc">{lv.desc}</span>
-                </button>
-              ))}
+              <label className="onboard-field-label" style={{ marginTop: 16 }}>What's your current level?</label>
+              <div className="onboard-level-grid">
+                {LEVELS.map(lv => (
+                  <button
+                    key={lv.id}
+                    className={`onboard-level-btn ${!input.trim() ? 'onboard-level-btn--disabled' : ''}`}
+                    disabled={!input.trim()}
+                    onClick={() => handleGenerate(lv.id)}
+                  >
+                    <span className="onboard-level-emoji">{lv.emoji}</span>
+                    <span className="onboard-level-label">{lv.label}</span>
+                    <span className="onboard-level-desc">{lv.desc}</span>
+                  </button>
+                ))}
+              </div>
+
+              {error && <div className="onboard-error">{error}</div>}
             </div>
           </>
         )}
