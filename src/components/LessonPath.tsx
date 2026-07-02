@@ -73,7 +73,7 @@ export default function LessonPath() {
               <span className="path-goal-label">Personalized for you</span>
               <span className="path-goal-desc">"{currentGoal}"</span>
             </div>
-            <button className="path-goal-edit" onClick={() => selectedCourse && openOnboarding(selectedCourse)} title="Change goal">✏️</button>
+            <button className="path-goal-edit" onClick={() => selectedCourse && openOnboarding(selectedCourse)}>✏️ Edit goal</button>
           </div>
         )}
 

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { COURSES } from '../data';
 
@@ -57,17 +57,16 @@ function LoadingGame({ lang }: { lang: string }) {
   const [questionIdx, setQuestionIdx] = useState(0);
   const [answered, setAnswered] = useState(false);
 
-  // Build shuffled question deck once
-  const deckRef = useRef<{ correct: (typeof WORD_BANK)[0]; options: (typeof WORD_BANK)[0][] }[]>([]);
-  useEffect(() => {
+  // Build shuffled question deck once using useMemo so it's available on first render
+  const deck = useMemo(() => {
     const shuffled = shuffle(WORD_BANK);
-    deckRef.current = shuffled.map((word) => {
+    return shuffled.map((word) => {
       const distractors = shuffle(WORD_BANK.filter(w => w !== word)).slice(0, 2);
       return { correct: word, options: shuffle([word, ...distractors]) };
     });
   }, []);
 
-  const q = deckRef.current[questionIdx % (deckRef.current.length || 1)];
+  const q = deck[questionIdx % deck.length];
 
   const advance = useCallback(() => {
     setAnswered(false);

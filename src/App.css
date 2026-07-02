@@ -3753,6 +3753,12 @@ input { font-family: inherit; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .path-goal-edit {
-  background: none; font-size: 16px; padding: 4px; border-radius: 8px; flex-shrink: 0;
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: 20px;
+  background: rgba(129,140,248,.15); border: 1.5px solid rgba(129,140,248,.4);
+  color: var(--lumi); font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
 }
-.path-goal-edit:hover { background: rgba(255,255,255,.08); }
+.path-goal-edit:hover { background: rgba(129,140,248,.28); border-color: var(--lumi); }
