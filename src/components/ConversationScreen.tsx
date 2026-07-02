@@ -281,6 +281,13 @@ export default function ConversationScreen() {
 
   // Pool of all words for this language (for distractors)
   const allWords = topics.flatMap(t => t.words);
+
+  // Look up pinyin/romaji for a target string (used to annotate MC options and pairs)
+  const getReading = (target: string): string | undefined => {
+    if (!showReadings) return undefined;
+    const w = allWords.find(w => w.target === target);
+    return w?.reading ?? w?.hint;
+  };
   // Characters available in the picker — unique chars from all lesson target words
   const pickerChars = usesCharPicker
     ? [...new Set(allWords.flatMap(w => [...w.target]))]
@@ -632,18 +639,25 @@ export default function ConversationScreen() {
           <div className="dl-prompt-card">
             <div className="dl-prompt-word">{qex.prompt}</div>
             {qex.promptSub && <div className="dl-prompt-hint">{qex.promptSub}</div>}
+            {showReadings && (qex.word?.reading || qex.word?.hint) && (
+              <div className="dl-prompt-reading">{qex.word.reading ?? qex.word.hint}</div>
+            )}
           </div>
           <div className="dl-options">
-            {qex.options.map((opt, i) => (
-              <button
-                key={i}
-                className={`dl-option ${quiz.selected === i ? 'selected' : ''} ${quiz.checked && i === qex.correct ? 'correct' : ''} ${quiz.checked && quiz.selected === i && i !== qex.correct ? 'wrong' : ''}`}
-                onClick={() => !quiz.checked && setQuiz(prev => prev ? { ...prev, selected: i } : prev)}
-                disabled={quiz.checked}
-              >
-                {opt}
-              </button>
-            ))}
+            {qex.options.map((opt, i) => {
+              const reading = getReading(opt);
+              return (
+                <button
+                  key={i}
+                  className={`dl-option ${quiz.selected === i ? 'selected' : ''} ${quiz.checked && i === qex.correct ? 'correct' : ''} ${quiz.checked && quiz.selected === i && i !== qex.correct ? 'wrong' : ''}`}
+                  onClick={() => !quiz.checked && setQuiz(prev => prev ? { ...prev, selected: i } : prev)}
+                  disabled={quiz.checked}
+                >
+                  {opt}
+                  {reading && <span className="dl-option-reading">{reading}</span>}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -786,16 +800,20 @@ export default function ConversationScreen() {
                 )}
               </div>
               <div className="dl-options">
-                {ex.options.map((opt, i) => (
-                  <button
-                    key={i}
-                    className={`dl-option ${ls.selected === i ? 'selected' : ''} ${ls.checked && i === ex.correct ? 'correct' : ''} ${ls.checked && ls.selected === i && i !== ex.correct ? 'wrong' : ''}`}
-                    onClick={() => !ls.checked && setLs(prev => prev ? { ...prev, selected: i } : prev)}
-                    disabled={ls.checked}
-                  >
-                    {opt}
-                  </button>
-                ))}
+                {ex.options.map((opt, i) => {
+                  const reading = getReading(opt);
+                  return (
+                    <button
+                      key={i}
+                      className={`dl-option ${ls.selected === i ? 'selected' : ''} ${ls.checked && i === ex.correct ? 'correct' : ''} ${ls.checked && ls.selected === i && i !== ex.correct ? 'wrong' : ''}`}
+                      onClick={() => !ls.checked && setLs(prev => prev ? { ...prev, selected: i } : prev)}
+                      disabled={ls.checked}
+                    >
+                      {opt}
+                      {reading && <span className="dl-option-reading">{reading}</span>}
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}
@@ -822,7 +840,12 @@ export default function ConversationScreen() {
                   readOnly={usesCharPicker}
                 />
                 {ls.checked && !ls.correct && (
-                  <div className="dl-correct-answer">Correct answer: <strong>{ex.answer}</strong>{ex.hint ? ` (${ex.hint})` : ''}</div>
+                  <div className="dl-correct-answer">
+                    Correct: <strong>{ex.answer}</strong>
+                    {showReadings && (ex.word?.reading || ex.word?.hint)
+                      ? <span className="dl-correct-reading"> {ex.word.reading ?? ex.word.hint}</span>
+                      : ex.hint ? ` (${ex.hint})` : ''}
+                  </div>
                 )}
               </div>
               {usesCharPicker && !ls.checked && (
@@ -857,10 +880,12 @@ export default function ConversationScreen() {
                   const matched = ls.pairsMatched.includes(left);
                   const sel = ls.pairsSelected?.side === 'left' && ls.pairsSelected.value === left;
                   const wrong = ls.pairsWrong === left;
+                  const reading = getReading(left);
                   return (
                     <button key={i} className={`dl-pair-btn ${matched ? 'matched' : ''} ${sel ? 'selected' : ''} ${wrong ? 'wrong' : ''}`}
                       onClick={() => !matched && handlePairsTap('left', left)} disabled={matched}>
                       {left}
+                      {reading && <span className="dl-pair-reading">{reading}</span>}
                     </button>
                   );
                 })}
