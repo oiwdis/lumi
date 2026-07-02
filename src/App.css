@@ -3661,6 +3661,80 @@ input { font-family: inherit; }
 .onboard-generating p { margin: 0 0 6px; font-size: 15px; color: var(--text); font-weight: 700; }
 .onboard-gen-sub { color: var(--muted) !important; font-size: 13px !important; font-weight: 400 !important; }
 
+/* ── Wait game ───────────────────────────────────────────────────────────── */
+.wg-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.wg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.wg-title { font-size: 14px; font-weight: 700; color: var(--muted); }
+.wg-score { font-size: 15px; font-weight: 800; color: var(--amber); }
+.wg-timer-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.wg-timer-fill {
+  height: 100%;
+  background: var(--lumi);
+  border-radius: 99px;
+  transition: width 0.05s linear, background 0.3s;
+}
+.wg-timer-fill--low { background: #ef4444; }
+.wg-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.wg-prompt-label { font-size: 13px; color: var(--muted); }
+.wg-prompt-word {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.5px;
+}
+.wg-streak {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--amber);
+  animation: pop 0.2s ease;
+}
+@keyframes pop { 0% { transform: scale(0.8); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+.wg-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wg-opt {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s, border-color 0.1s, transform 0.1s;
+}
+.wg-opt:hover:not(:disabled) { background: var(--surface); border-color: var(--lumi); transform: translateY(-1px); }
+.wg-opt:disabled { cursor: default; }
+.wg-opt--correct { background: rgba(34,197,94,.15) !important; border-color: #22c55e !important; color: #22c55e !important; }
+.wg-opt--wrong   { background: rgba(239,68,68,.10) !important; border-color: #ef4444 !important; color: #ef4444 !important; }
+
 /* ── Path goal banner ────────────────────────────────────────────────────── */
 .path-goal-banner {
   display: flex; align-items: center; gap: 10px;
