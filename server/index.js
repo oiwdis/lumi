@@ -27,6 +27,22 @@ function hash(password) {
   return crypto.createHash('sha256').update(password + 'linguo-salt').digest('hex');
 }
 
+function getAuthUser(req) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return null;
+  const token = auth.slice(7);
+  try {
+    const decoded = Buffer.from(token, 'base64').toString('utf8');
+    const colonIdx = decoded.indexOf(':');
+    const email = decoded.slice(0, colonIdx);
+    const passwordHash = decoded.slice(colonIdx + 1);
+    const users = loadUsers();
+    const user = users[email];
+    if (!user || user.passwordHash !== passwordHash) return null;
+    return { user, email };
+  } catch { return null; }
+}
+
 // ── App ──────────────────────────────────────────────────────────────────────
 
 const app = express();
@@ -62,6 +78,24 @@ app.post('/api/auth/login', (req, res) => {
 
   const { passwordHash: _, ...safe } = user;
   res.json({ user: safe, token: Buffer.from(`${email}:${hash(password)}`).toString('base64') });
+});
+
+// Progress sync — GET returns server progress, POST saves it
+app.get('/api/progress', (req, res) => {
+  const auth = getAuthUser(req);
+  if (!auth) return res.status(401).json({ error: 'Unauthorized' });
+  const users = loadUsers();
+  const progress = users[auth.email].progress ?? null;
+  res.json(progress);
+});
+
+app.post('/api/progress', (req, res) => {
+  const auth = getAuthUser(req);
+  if (!auth) return res.status(401).json({ error: 'Unauthorized' });
+  const users = loadUsers();
+  users[auth.email].progress = req.body;
+  saveUsers(users);
+  res.json({ ok: true });
 });
 
 // AI Tutor (streaming)
@@ -100,7 +134,7 @@ app.post('/api/tutor', async (req, res) => {
 
 // AI lesson customization
 app.post('/api/customize', async (req, res) => {
-  const { courseId, language, goal } = req.body;
+  const { courseId, language, goal, level = 'beginner' } = req.body;
   if (!goal || !language) return res.status(400).json({ error: 'goal and language required' });
 
   if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'AI not configured' });
@@ -145,7 +179,8 @@ Rules:
 - Tailor everything tightly to the learner's stated goal — no generic vocabulary
 - Unit colors must come from this list: ${COLORS.join(', ')}
 - All target language text must be accurate ${language}
-- Keep lesson titles short (2–3 words)${readingNote ? '\n- ' + readingNote : ''}`;
+- Keep lesson titles short (2–3 words)
+- Learner experience level: ${level}. ${level === 'beginner' ? 'Use simple, short phrases. Avoid complex grammar. Prioritize survival vocabulary.' : level === 'intermediate' ? 'Use full sentences and introduce some grammar patterns. Learner knows basics already.' : 'Use natural, nuanced language. Include idiomatic expressions and complex structures.'}${readingNote ? '\n- ' + readingNote : ''}`;
 
   try {
     const response = await client.messages.create({
@@ -153,7 +188,7 @@ Rules:
       max_tokens: 8000,
       thinking: { type: 'adaptive' },
       system: systemPrompt,
-      messages: [{ role: 'user', content: `Course: ${courseId}\nLearner's goal: ${goal}` }],
+      messages: [{ role: 'user', content: `Course: ${courseId}\nLearner's goal: ${goal}\nExperience level: ${level}` }],
     });
 
     const text = response.content.find(b => b.type === 'text')?.text ?? '';

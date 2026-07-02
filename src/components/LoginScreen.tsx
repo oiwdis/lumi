@@ -1,26 +1,7 @@
 import { useState } from 'react';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface Props {
-  onAuth: (user: User) => void;
-}
-
-// Simple client-side credential store — survives deploys since it's in localStorage
-function getAccounts(): Record<string, { user: User; passwordHash: string }> {
-  try { return JSON.parse(localStorage.getItem('lumi-accounts') ?? '{}'); } catch { return {}; }
-}
-function saveAccounts(accounts: Record<string, { user: User; passwordHash: string }>) {
-  localStorage.setItem('lumi-accounts', JSON.stringify(accounts));
-}
-async function hashPassword(password: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password + 'lumi-salt'));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
+interface User { id: string; name: string; email: string; }
+interface Props { onAuth: (user: User, token: string) => void; }
 
 export default function LoginScreen({ onAuth }: Props) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -38,20 +19,19 @@ export default function LoginScreen({ onAuth }: Props) {
 
     setLoading(true);
     try {
-      const ph = await hashPassword(password);
-      const accounts = getAccounts();
-
-      if (mode === 'signup') {
-        if (accounts[email]) { setError('Email already registered'); return; }
-        const user: User = { id: crypto.randomUUID(), name, email };
-        accounts[email] = { user, passwordHash: ph };
-        saveAccounts(accounts);
-        onAuth(user);
-      } else {
-        const entry = accounts[email];
-        if (!entry || entry.passwordHash !== ph) { setError('Invalid email or password'); return; }
-        onAuth(entry.user);
-      }
+      const endpoint = mode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
+      const body = mode === 'signup' ? { name, email, password } : { email, password };
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? 'Something went wrong'); return; }
+      localStorage.setItem('lumi-token', data.token);
+      onAuth(data.user, data.token);
+    } catch {
+      setError('Could not connect to server. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -62,62 +42,32 @@ export default function LoginScreen({ onAuth }: Props) {
   return (
     <div className="login-screen">
       <div className="login-hero">
-        <div className="login-logo">🌱</div>
+        <span className="login-owl">🌱</span>
         <h1 className="login-title">Lumi</h1>
-        <p className="login-tagline">Your AI language tutor</p>
+        <p className="login-sub">AI-powered language learning</p>
       </div>
 
       <div className="login-card">
         <div className="login-tabs">
-          <button
-            className={`login-tab ${mode === 'login' ? 'login-tab--active' : ''}`}
-            onClick={() => { setMode('login'); setError(''); }}
-          >
-            Log in
-          </button>
-          <button
-            className={`login-tab ${mode === 'signup' ? 'login-tab--active' : ''}`}
-            onClick={() => { setMode('signup'); setError(''); }}
-          >
-            Sign up
-          </button>
+          <button className={`login-tab ${mode === 'login' ? 'active' : ''}`} onClick={() => { setMode('login'); setError(''); }}>Log in</button>
+          <button className={`login-tab ${mode === 'signup' ? 'active' : ''}`} onClick={() => { setMode('signup'); setError(''); }}>Sign up</button>
         </div>
 
         <div className="login-fields">
           {mode === 'signup' && (
-            <input
-              className="login-input"
-              type="text"
-              placeholder="Your name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              onKeyDown={handleKey}
-              autoFocus
-            />
+            <input className="login-input" placeholder="Your name" value={name}
+              onChange={e => setName(e.target.value)} onKeyDown={handleKey} autoFocus />
           )}
-          <input
-            className="login-input"
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={handleKey}
-            autoFocus={mode === 'login'}
-          />
-          <input
-            className="login-input"
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={handleKey}
-          />
+          <input className="login-input" placeholder="Email" type="email" value={email}
+            onChange={e => setEmail(e.target.value)} onKeyDown={handleKey} autoFocus={mode === 'login'} />
+          <input className="login-input" placeholder="Password" type="password" value={password}
+            onChange={e => setPassword(e.target.value)} onKeyDown={handleKey} />
         </div>
 
-        {error && <p className="login-error">{error}</p>}
+        {error && <div className="login-error">{error}</div>}
 
-        <button className="login-submit" onClick={submit} disabled={loading}>
-          {loading ? '…' : mode === 'login' ? 'Log in' : 'Create account'}
+        <button className="login-btn" onClick={submit} disabled={loading}>
+          {loading ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Log in'}
         </button>
       </div>
     </div>

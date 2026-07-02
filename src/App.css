@@ -3661,6 +3661,31 @@ input { font-family: inherit; }
 .onboard-generating p { margin: 0 0 6px; font-size: 15px; color: var(--text); font-weight: 700; }
 .onboard-gen-sub { color: var(--muted) !important; font-size: 13px !important; font-weight: 400 !important; }
 
+/* ── Level picker ── */
+.onboard-level-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.onboard-level-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.onboard-level-btn:hover { border-color: var(--lumi); background: var(--bg); transform: translateY(-1px); }
+.onboard-level-btn--selected { border-color: var(--lumi); background: rgba(129,140,248,.08); }
+.onboard-level-emoji { font-size: 26px; flex-shrink: 0; }
+.onboard-level-label { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; }
+.onboard-level-desc { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
 /* ── Wait game ───────────────────────────────────────────────────────────── */
 .wg-wrap {
   background: var(--surface);

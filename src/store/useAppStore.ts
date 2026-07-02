@@ -22,6 +22,15 @@ function loadProgress(userId: string): UserProgress {
 
 function saveProgress(userId: string, p: UserProgress) {
   localStorage.setItem(`lumi-progress-${userId}`, JSON.stringify(p));
+  // Fire-and-forget sync to server so other devices see it
+  const token = localStorage.getItem('lumi-token');
+  if (token) {
+    fetch('/api/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(p),
+    }).catch(() => {});
+  }
 }
 
 type Screen = 'login' | 'select' | 'onboarding' | 'path' | 'chat' | 'profile';
@@ -45,7 +54,7 @@ interface AppStore {
   customLessons: Record<string, CustomUnit[]>;
   customGoal: Record<string, string>;
 
-  login: (user: AuthUser) => void;
+  login: (user: AuthUser, token?: string) => void;
   logout: () => void;
   setCourse: (c: CourseId) => void;
   startLesson: (lessonId: string) => void;
@@ -94,16 +103,48 @@ export const useAppStore = create<AppStore>()(
       customLessons: {},
       customGoal: {},
 
-      login: (user) => {
-        const progress = loadProgress(user.id);
+      login: (user, token?: string) => {
+        const localProgress = loadProgress(user.id);
         localStorage.setItem('lumi-user', JSON.stringify(user));
         if (user.email === 'elliot@themaclan.com') {
-          const adminProgress: UserProgress = { ...progress, xp: 9999, coins: 99999, streak: 999 };
+          const adminProgress: UserProgress = { ...localProgress, xp: 9999, coins: 99999, streak: 999 };
           saveProgress(user.id, adminProgress);
           set({ user, screen: 'select', ...adminProgress });
           return;
         }
-        set({ user, screen: 'select', ...progress });
+        // Show local progress immediately, then merge with server in background
+        set({ user, screen: 'select', ...localProgress });
+        const authToken = token ?? localStorage.getItem('lumi-token');
+        if (authToken) {
+          fetch('/api/progress', { headers: { 'Authorization': `Bearer ${authToken}` } })
+            .then(r => r.ok ? r.json() : null)
+            .then((serverProgress: UserProgress | null) => {
+              if (!serverProgress) return;
+              // Merge: take higher XP/coins/streak, union completed lessons, prefer server custom lessons if present
+              const current = useAppStore.getState();
+              const base = getFullProgress(current);
+              const merged: UserProgress = {
+                xp: Math.max(base.xp, serverProgress.xp ?? 0),
+                coins: Math.max(base.coins, serverProgress.coins ?? 0),
+                streak: Math.max(base.streak, serverProgress.streak ?? 0),
+                lastSessionDate: base.lastSessionDate ?? serverProgress.lastSessionDate,
+                completedLessons: (() => {
+                  const out: Record<string, string[]> = { ...base.completedLessons };
+                  for (const [c, ids] of Object.entries(serverProgress.completedLessons ?? {})) {
+                    out[c] = [...new Set([...(out[c] ?? []), ...(ids as string[])])];
+                  }
+                  return out;
+                })(),
+                customLessons: Object.keys(serverProgress.customLessons ?? {}).length
+                  ? serverProgress.customLessons
+                  : base.customLessons,
+                customGoal: { ...base.customGoal, ...serverProgress.customGoal },
+              };
+              saveProgress(user.id, merged);
+              set(merged);
+            })
+            .catch(() => {});
+        }
       },
 
       logout: () => {

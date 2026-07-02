@@ -146,19 +146,29 @@ function LoadingGame({ lang }: { lang: string }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+type Level = 'beginner' | 'intermediate' | 'advanced';
+
+const LEVELS: { id: Level; label: string; emoji: string; desc: string }[] = [
+  { id: 'beginner',     label: 'Beginner',     emoji: '🌱', desc: 'Little to no experience' },
+  { id: 'intermediate', label: 'Intermediate', emoji: '🌿', desc: 'Know some basics already' },
+  { id: 'advanced',     label: 'Advanced',     emoji: '🌳', desc: 'Conversational or higher' },
+];
+
 export default function OnboardingChat() {
   const { selectedCourse, setCustomLessons, skipOnboarding, goBack } = useAppStore();
   const course = COURSES.find(c => c.id === selectedCourse);
   const lang = selectedCourse ? (LANG_GREETING[selectedCourse] ?? 'this language') : 'this language';
 
+  const [step, setStep] = useState<'goal' | 'level'>('goal');
   const [input, setInput] = useState('');
+  const [level, setLevel] = useState<Level | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => { if (step === 'goal') inputRef.current?.focus(); }, [step]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (chosenLevel: Level) => {
     if (!input.trim() || !selectedCourse) return;
     setLoading(true);
     setError('');
@@ -166,7 +176,7 @@ export default function OnboardingChat() {
       const res = await fetch('/api/customize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ courseId: selectedCourse, language: lang, goal: input.trim() }),
+        body: JSON.stringify({ courseId: selectedCourse, language: lang, goal: input.trim(), level: chosenLevel }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to generate lessons');
       const data = await res.json();
@@ -178,14 +188,18 @@ export default function OnboardingChat() {
     }
   };
 
+  const handleGoalNext = () => {
+    if (input.trim()) setStep('level');
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGoalNext(); }
   };
 
   return (
     <div className="onboard-screen">
       <div className="onboard-topbar">
-        <button className="onboard-back" onClick={goBack}>←</button>
+        <button className="onboard-back" onClick={step === 'level' ? () => setStep('goal') : goBack}>←</button>
         <span className="onboard-flags">{course?.fromFlag} → {course?.toFlag}</span>
         <button className="onboard-skip" onClick={skipOnboarding}>Skip</button>
       </div>
@@ -201,8 +215,8 @@ export default function OnboardingChat() {
             </div>
             <LoadingGame lang={lang} />
           </>
-        ) : (
-          /* ── Input state ── */
+        ) : step === 'goal' ? (
+          /* ── Step 1: Why are you learning? ── */
           <>
             <div className="onboard-ai-bubble">
               <div className="onboard-ai-avatar">🌱</div>
@@ -232,11 +246,39 @@ export default function OnboardingChat() {
               {error && <div className="onboard-error">{error}</div>}
               <button
                 className="onboard-btn"
-                onClick={handleGenerate}
-                disabled={!input.trim() || loading}
+                onClick={handleGoalNext}
+                disabled={!input.trim()}
               >
-                ✨ Build my lessons →
+                Next →
               </button>
+            </div>
+          </>
+        ) : (
+          /* ── Step 2: Experience level ── */
+          <>
+            <div className="onboard-ai-bubble">
+              <div className="onboard-ai-avatar">🌱</div>
+              <div className="onboard-ai-text">
+                <p>Got it! One more thing — <strong>what's your current level in {lang}?</strong></p>
+                <p>This helps Lumi pitch the lessons at the right difficulty.</p>
+              </div>
+            </div>
+
+            <div className="onboard-level-grid">
+              {LEVELS.map(lv => (
+                <button
+                  key={lv.id}
+                  className={`onboard-level-btn ${level === lv.id ? 'onboard-level-btn--selected' : ''}`}
+                  onClick={() => {
+                    setLevel(lv.id);
+                    handleGenerate(lv.id);
+                  }}
+                >
+                  <span className="onboard-level-emoji">{lv.emoji}</span>
+                  <span className="onboard-level-label">{lv.label}</span>
+                  <span className="onboard-level-desc">{lv.desc}</span>
+                </button>
+              ))}
             </div>
           </>
         )}

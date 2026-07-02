@@ -13,7 +13,7 @@ export default function App() {
 
   return (
     <div className="app">
-      {screen === 'login' && <LoginScreen onAuth={login} />}
+      {screen === 'login' && <LoginScreen onAuth={(user, token) => login(user, token)} />}
       {screen === 'select' && <LanguageSelect />}
       {screen === 'onboarding' && <OnboardingChat />}
       {screen === 'path' && <LessonPath />}
