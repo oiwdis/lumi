@@ -6,28 +6,56 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
+import pg from 'pg';
 
+const { Pool } = pg;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const USERS_FILE = join(__dirname, 'users.json');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ── Simple user store ────────────────────────────────────────────────────────
+// ── Database ─────────────────────────────────────────────────────────────────
+// Uses PostgreSQL when DATABASE_URL is set (Railway production),
+// falls back to users.json for local dev.
 
-function loadUsers() {
-  if (!existsSync(USERS_FILE)) return {};
-  return JSON.parse(readFileSync(USERS_FILE, 'utf8'));
+let pool = null;
+
+if (process.env.DATABASE_URL) {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      email       TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at  BIGINT NOT NULL,
+      progress    JSONB
+    )
+  `).then(() => console.log('PostgreSQL ready'))
+    .catch(err => console.error('DB init error:', err.message));
 }
 
-function saveUsers(users) {
-  writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-}
+// ── Storage helpers ───────────────────────────────────────────────────────────
 
 function hash(password) {
   return crypto.createHash('sha256').update(password + 'linguo-salt').digest('hex');
 }
 
-function getAuthUser(req) {
+// File-based fallbacks (local dev only)
+function loadUsers() {
+  if (!existsSync(USERS_FILE)) return {};
+  return JSON.parse(readFileSync(USERS_FILE, 'utf8'));
+}
+function saveUsers(users) {
+  writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+// Resolve auth from Bearer token → { email, passwordHash } or null
+async function getAuthUser(req) {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return null;
   const token = auth.slice(7);
@@ -36,10 +64,20 @@ function getAuthUser(req) {
     const colonIdx = decoded.indexOf(':');
     const email = decoded.slice(0, colonIdx);
     const passwordHash = decoded.slice(colonIdx + 1);
-    const users = loadUsers();
-    const user = users[email];
-    if (!user || user.passwordHash !== passwordHash) return null;
-    return { user, email };
+
+    if (pool) {
+      const { rows } = await pool.query(
+        'SELECT * FROM users WHERE email = $1', [email]
+      );
+      const user = rows[0];
+      if (!user || user.password_hash !== passwordHash) return null;
+      return { email, passwordHash };
+    } else {
+      const users = loadUsers();
+      const user = users[email];
+      if (!user || user.passwordHash !== passwordHash) return null;
+      return { email, passwordHash };
+    }
   } catch { return null; }
 }
 
@@ -50,51 +88,93 @@ app.use(cors());
 app.use(express.json());
 
 // Signup
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' });
 
-  const users = loadUsers();
-  if (users[email]) return res.status(409).json({ error: 'Email already registered' });
+  const ph = hash(password);
+  const id = crypto.randomUUID();
+  const createdAt = Date.now();
 
-  const user = { id: crypto.randomUUID(), name, email, passwordHash: hash(password), createdAt: Date.now() };
-  users[email] = user;
-  saveUsers(users);
+  if (pool) {
+    try {
+      await pool.query(
+        'INSERT INTO users (id, name, email, password_hash, created_at) VALUES ($1,$2,$3,$4,$5)',
+        [id, name, email, ph, createdAt]
+      );
+    } catch (err) {
+      if (err.code === '23505') return res.status(409).json({ error: 'Email already registered' });
+      return res.status(500).json({ error: 'Database error' });
+    }
+  } else {
+    const users = loadUsers();
+    if (users[email]) return res.status(409).json({ error: 'Email already registered' });
+    users[email] = { id, name, email, passwordHash: ph, createdAt };
+    saveUsers(users);
+  }
 
-  const { passwordHash: _, ...safe } = user;
-  res.json({ user: safe, token: Buffer.from(`${email}:${hash(password)}`).toString('base64') });
+  const token = Buffer.from(`${email}:${ph}`).toString('base64');
+  res.json({ user: { id, name, email, createdAt }, token });
 });
 
 // Login
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-  const users = loadUsers();
-  const user = users[email];
-  if (!user || user.passwordHash !== hash(password)) {
-    return res.status(401).json({ error: 'Invalid email or password' });
+  const ph = hash(password);
+
+  if (pool) {
+    const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = rows[0];
+    if (!user || user.password_hash !== ph) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    const token = Buffer.from(`${email}:${ph}`).toString('base64');
+    return res.json({
+      user: { id: user.id, name: user.name, email: user.email, createdAt: user.created_at },
+      token,
+    });
+  } else {
+    const users = loadUsers();
+    const user = users[email];
+    if (!user || user.passwordHash !== ph) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    const { passwordHash: _, ...safe } = user;
+    const token = Buffer.from(`${email}:${ph}`).toString('base64');
+    return res.json({ user: safe, token });
   }
-
-  const { passwordHash: _, ...safe } = user;
-  res.json({ user: safe, token: Buffer.from(`${email}:${hash(password)}`).toString('base64') });
 });
 
-// Progress sync — GET returns server progress, POST saves it
-app.get('/api/progress', (req, res) => {
-  const auth = getAuthUser(req);
+// Progress — GET returns saved progress, POST saves it
+app.get('/api/progress', async (req, res) => {
+  const auth = await getAuthUser(req);
   if (!auth) return res.status(401).json({ error: 'Unauthorized' });
-  const users = loadUsers();
-  const progress = users[auth.email].progress ?? null;
-  res.json(progress);
+
+  if (pool) {
+    const { rows } = await pool.query('SELECT progress FROM users WHERE email = $1', [auth.email]);
+    return res.json(rows[0]?.progress ?? null);
+  } else {
+    const users = loadUsers();
+    return res.json(users[auth.email]?.progress ?? null);
+  }
 });
 
-app.post('/api/progress', (req, res) => {
-  const auth = getAuthUser(req);
+app.post('/api/progress', async (req, res) => {
+  const auth = await getAuthUser(req);
   if (!auth) return res.status(401).json({ error: 'Unauthorized' });
-  const users = loadUsers();
-  users[auth.email].progress = req.body;
-  saveUsers(users);
+
+  if (pool) {
+    await pool.query(
+      'UPDATE users SET progress = $1 WHERE email = $2',
+      [req.body, auth.email]
+    );
+  } else {
+    const users = loadUsers();
+    users[auth.email].progress = req.body;
+    saveUsers(users);
+  }
   res.json({ ok: true });
 });
 
@@ -192,9 +272,7 @@ Rules:
     });
 
     const text = response.content.find(b => b.type === 'text')?.text ?? '';
-    // Strip markdown code fences if present
     const stripped = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
-    // Find outermost JSON object
     const start = stripped.indexOf('{');
     const end = stripped.lastIndexOf('}');
     if (start === -1 || end === -1) return res.status(500).json({ error: 'AI returned no JSON' });
@@ -210,12 +288,5 @@ Rules:
   }
 });
 
-// Serve built frontend in production
-if (process.env.NODE_ENV === 'production') {
-  const distPath = join(__dirname, '../dist');
-  app.use(express.static(distPath));
-  app.get('/{*path}', (req, res) => res.sendFile(join(distPath, 'index.html')));
-}
-
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Lumi server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

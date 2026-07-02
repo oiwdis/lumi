@@ -66,7 +66,7 @@ export default function LessonPath() {
       {/* Lesson grid */}
       <div className="path-scroll">
         {/* Personalization banner */}
-        {currentGoal && (
+        {currentGoal ? (
           <div className="path-goal-banner">
             <span className="path-goal-icon">✨</span>
             <div className="path-goal-text">
@@ -74,6 +74,15 @@ export default function LessonPath() {
               <span className="path-goal-desc">"{currentGoal}"</span>
             </div>
             <button className="path-goal-edit" onClick={() => selectedCourse && openOnboarding(selectedCourse)}>✏️ Edit goal</button>
+          </div>
+        ) : (
+          <div className="path-goal-banner path-goal-banner--empty" onClick={() => selectedCourse && openOnboarding(selectedCourse)}>
+            <span className="path-goal-icon">🌱</span>
+            <div className="path-goal-text">
+              <span className="path-goal-label">Make these lessons yours</span>
+              <span className="path-goal-desc">Tell Lumi why you're learning {langName} — get a personalised curriculum in 15 seconds</span>
+            </div>
+            <button className="path-goal-edit path-goal-edit--cta" onClick={() => selectedCourse && openOnboarding(selectedCourse)}>Set goal →</button>
           </div>
         )}
 
