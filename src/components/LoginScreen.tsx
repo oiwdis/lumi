@@ -49,8 +49,8 @@ export default function LoginScreen({ onAuth }: Props) {
 
       <div className="login-card">
         <div className="login-tabs">
-          <button className={`login-tab ${mode === 'login' ? 'active' : ''}`} onClick={() => { setMode('login'); setError(''); }}>Log in</button>
-          <button className={`login-tab ${mode === 'signup' ? 'active' : ''}`} onClick={() => { setMode('signup'); setError(''); }}>Sign up</button>
+          <button className={`login-tab ${mode === 'login' ? 'login-tab--active' : ''}`} onClick={() => { setMode('login'); setError(''); }}>Log in</button>
+          <button className={`login-tab ${mode === 'signup' ? 'login-tab--active' : ''}`} onClick={() => { setMode('signup'); setError(''); }}>Sign up</button>
         </div>
 
         <div className="login-fields">
@@ -66,7 +66,7 @@ export default function LoginScreen({ onAuth }: Props) {
 
         {error && <div className="login-error">{error}</div>}
 
-        <button className="login-btn" onClick={submit} disabled={loading}>
+        <button className="login-submit" onClick={submit} disabled={loading}>
           {loading ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Log in'}
         </button>
       </div>
