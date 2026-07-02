@@ -295,8 +295,9 @@ Rules:
 });
 
 // Fall through to index.html for any non-API route (SPA)
+// app.use (no path) works as a catch-all in Express 4 and 5
 if (existsSync(distPath)) {
-  app.get('*', (_req, res) => res.sendFile(join(distPath, 'index.html')));
+  app.use((_req, res) => res.sendFile(join(distPath, 'index.html')));
 }
 
 const PORT = process.env.PORT || 3001;
