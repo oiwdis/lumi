@@ -973,7 +973,7 @@ export default function ConversationScreen() {
           unread={chatUnread}
           onSend={handleChatSend}
           ttsLang={ttsLang}
-          currentWord={ex && ex.kind !== 'pairs' ? { target: (ex as MCExercise | TypeExercise).word.target, english: (ex as MCExercise | TypeExercise).word.english } : undefined}
+          currentWord={ex && ex.kind !== 'pairs' && ex.kind !== 'flash' ? { target: (ex as MCExercise | TypeExercise).word.target, english: (ex as MCExercise | TypeExercise).word.english } : undefined}
           langName={langName}
         />
       </div>
