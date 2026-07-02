@@ -13,7 +13,7 @@ export default function LanguageSelect() {
       <div className="select-hero">
         <span className="select-owl">🌱</span>
         <h1 className="select-title">Lumi</h1>
-        <p className="select-sub">Learn through stories, not flashcards.</p>
+        <p className="select-sub">Your goals. Your lessons. Your language.</p>
       </div>
 
       <div className="select-label">Choose your course</div>
