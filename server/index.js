@@ -220,7 +220,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: 'Lumi <noreply@lumilanguage.up.railway.app>',
+        from: 'Lumi <onboarding@resend.dev>',
         to: email,
         subject: 'Reset your Lumi password',
         html: `<p>Hi! Click the link below to reset your Lumi password. This link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you didn't request this, you can ignore this email.</p>`,
