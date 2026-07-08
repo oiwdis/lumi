@@ -9,6 +9,8 @@ export const COURSES: CourseInfo[] = [
   { id: 'en-zh', fromFlag: '🇺🇸', toFlag: '🇨🇳', fromLang: 'English', toLang: 'Chinese', color: '#FF4B4B', tagline: '1B+ speakers worldwide' },
   { id: 'en-fr', fromFlag: '🇺🇸', toFlag: '🇫🇷', fromLang: 'English', toLang: 'French', color: '#CE82FF', tagline: '300M+ speakers worldwide' },
   { id: 'en-ja', fromFlag: '🇺🇸', toFlag: '🇯🇵', fromLang: 'English', toLang: 'Japanese', color: '#FF6B9D', tagline: '125M+ speakers, rich culture' },
+  { id: 'en-ko', fromFlag: '🇺🇸', toFlag: '🇰🇷', fromLang: 'English', toLang: 'Korean', color: '#00C4CC', tagline: '80M+ speakers, K-pop & K-drama' },
+  { id: 'en-de', fromFlag: '🇺🇸', toFlag: '🇩🇪', fromLang: 'English', toLang: 'German', color: '#58CC02', tagline: '100M+ speakers across Europe' },
 ];
 
 export const ALL_STORIES: Story[] = [

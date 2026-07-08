@@ -6,7 +6,7 @@ import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
 import Avatar from './Avatar';
 
 const LANG_NAME: Record<string, string> = {
-  'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese',
+  'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese', 'en-ko': 'Korean', 'en-de': 'German',
 };
 
 export default function LessonPath() {

@@ -10,10 +10,10 @@ import AIChat, { type ChatMessage } from './AIChat';
 // ── types ─────────────────────────────────────────────────────────────────────
 
 const TTS_LANG: Record<string, string> = {
-  'en-es': 'es-ES', 'en-zh': 'zh-CN', 'en-fr': 'fr-FR', 'en-ja': 'ja-JP',
+  'en-es': 'es-ES', 'en-zh': 'zh-CN', 'en-fr': 'fr-FR', 'en-ja': 'ja-JP', 'en-ko': 'ko-KR', 'en-de': 'de-DE',
 };
 const LANG_NAME: Record<string, string> = {
-  'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese',
+  'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese', 'en-ko': 'Korean', 'en-de': 'German',
 };
 
 type Mode = 'voice' | 'silent';
@@ -257,8 +257,8 @@ async function fetchAIResponse(
 
 export default function ConversationScreen() {
   const { selectedCourse, currentLessonId, user, xp, streak, customLessons, addXp, goBack, completeLesson, logout } = useAppStore();
-  const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja';
-  const showReadings = selectedCourse === 'en-zh' || selectedCourse === 'en-ja';
+  const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
+  const showReadings = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
 
   // Track coins earned during this lesson session
   const lessonCoinsRef = useRef(0);

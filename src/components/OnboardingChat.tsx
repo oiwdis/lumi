@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import { COURSES } from '../data';
 
 const LANG_GREETING: Record<string, string> = {
-  'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese',
+  'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese', 'en-ko': 'Korean', 'en-de': 'German',
 };
 
 // ── Mini-game word bank ───────────────────────────────────────────────────────
