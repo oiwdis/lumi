@@ -88,7 +88,7 @@ export default function App() {
   return (
     <div className="app">
       {screen === 'home'       && <HomeScreen onGetStarted={() => setScreen('login')} />}
-      {screen === 'login'      && <LoginScreen onAuth={(user, token) => login(user, token)} initialTab={initialTab as 'login' | 'signup'} />}
+      {screen === 'login'      && <LoginScreen onAuth={(user, token) => login(user, token)} initialTab={initialTab as 'login' | 'signup'} onBack={() => setScreen('home')} />}
       {screen === 'select'     && <LanguageSelect />}
       {screen === 'onboarding' && <OnboardingChat />}
       {screen === 'path'       && <LessonPath />}

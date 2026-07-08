@@ -1,11 +1,11 @@
 import { useState } from 'react';
 
 interface User { id: string; name: string; email: string; }
-interface Props { onAuth: (user: User, token: string) => void; initialTab?: 'login' | 'signup'; }
+interface Props { onAuth: (user: User, token: string) => void; initialTab?: 'login' | 'signup'; onBack?: () => void; }
 
 type View = 'auth' | 'forgot' | 'forgot-sent';
 
-export default function LoginScreen({ onAuth, initialTab = 'login' }: Props) {
+export default function LoginScreen({ onAuth, initialTab = 'login', onBack }: Props) {
   const [mode, setMode] = useState<'login' | 'signup'>(initialTab);
   const [view, setView] = useState<View>('auth');
   const [name, setName] = useState('');
@@ -99,6 +99,9 @@ export default function LoginScreen({ onAuth, initialTab = 'login' }: Props) {
 
   return (
     <div className="login-screen">
+      {onBack && (
+        <button className="login-back" onClick={onBack}>← Back</button>
+      )}
       <div className="login-hero">
         <span className="login-owl">🌱</span>
         <h1 className="login-title">Lumi</h1>

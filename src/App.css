@@ -1785,6 +1785,7 @@ input { font-family: inherit; }
 /* ─── Login / Signup ─────────────────────────────────────────────────────────── */
 
 .login-screen {
+  position: relative;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -1882,6 +1883,8 @@ input { font-family: inherit; }
 .login-submit:active:not(:disabled) { transform: translateY(0); }
 .login-submit:disabled { opacity: .45; cursor: default; }
 
+.login-back { position: absolute; top: 20px; left: 20px; background: none; border: none; color: var(--muted); font-size: 14px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: color 0.15s, background 0.15s; }
+.login-back:hover { color: var(--text); background: var(--surface); }
 .login-forgot { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; text-align: right; padding: 0; text-decoration: underline; }
 .login-forgot:hover { color: var(--text); }
 .login-success { color: #4ade80; font-size: 13px; text-align: center; }
