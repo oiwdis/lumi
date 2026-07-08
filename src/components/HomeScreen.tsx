@@ -38,6 +38,8 @@ const LANGUAGES = [
   { flag: '🇫🇷', name: 'French' },
   { flag: '🇨🇳', name: 'Chinese' },
   { flag: '🇯🇵', name: 'Japanese' },
+  { flag: '🇰🇷', name: 'Korean' },
+  { flag: '🇩🇪', name: 'German' },
 ];
 
 export default function HomeScreen({ onGetStarted }: Props) {
