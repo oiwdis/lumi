@@ -10,7 +10,7 @@ const LANG_NAME: Record<string, string> = {
 };
 
 export default function LessonPath() {
-  const { selectedCourse, completedLessons, xp, streak, coins, customLessons, customGoal, startLesson, goBack, logout, openProfile, openOnboarding } = useAppStore();
+  const { selectedCourse, completedLessons, xp, streak, coins, customLessons, customGoal, goalSkipped, startLesson, goBack, logout, openProfile, openOnboarding } = useAppStore();
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const langName = selectedCourse ? (LANG_NAME[selectedCourse] ?? 'Unknown') : '';
   const done = selectedCourse ? (completedLessons[selectedCourse] ?? []) : [];
@@ -26,6 +26,7 @@ export default function LessonPath() {
 
   const currentIdx = activeFlatLessons.findIndex(l => !done.includes(l.id));
   const currentGoal = selectedCourse ? (customGoal[selectedCourse] ?? null) : null;
+  const hasSkipped = selectedCourse ? (goalSkipped[selectedCourse] ?? false) : false;
 
   let flatIdx = 0;
 
@@ -75,7 +76,7 @@ export default function LessonPath() {
             </div>
             <button className="path-goal-edit" onClick={() => selectedCourse && openOnboarding(selectedCourse)}>✏️ Edit goal</button>
           </div>
-        ) : (
+        ) : !hasSkipped ? (
           <div className="path-goal-banner path-goal-banner--empty" onClick={() => selectedCourse && openOnboarding(selectedCourse)}>
             <span className="path-goal-icon">🌱</span>
             <div className="path-goal-text">
@@ -84,7 +85,7 @@ export default function LessonPath() {
             </div>
             <button className="path-goal-edit path-goal-edit--cta" onClick={() => selectedCourse && openOnboarding(selectedCourse)}>Set goal →</button>
           </div>
-        )}
+        ) : null}
 
         {activeUnits.map(unit => {
           const unitStart = flatIdx;
