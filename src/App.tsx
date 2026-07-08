@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from './store/useAppStore';
 import HomeScreen from './components/HomeScreen';
 import LoginScreen from './components/LoginScreen';
@@ -10,44 +11,89 @@ import ProfileScreen from './components/ProfileScreen';
 import OnboardingChat from './components/OnboardingChat';
 import './App.css';
 
+type Screen = 'home' | 'login' | 'select' | 'onboarding' | 'path' | 'chat' | 'profile';
+
+const SCREEN_TO_PATH: Record<Screen, string> = {
+  home:       '/',
+  login:      '/login',
+  select:     '/learn',
+  onboarding: '/onboarding',
+  path:       '/path',
+  chat:       '/lesson',
+  profile:    '/profile',
+};
+
+const PATH_TO_SCREEN: Record<string, Screen> = {
+  '/':           'home',
+  '/login':      'login',
+  '/signup':     'login',
+  '/learn':      'select',
+  '/onboarding': 'onboarding',
+  '/path':       'path',
+  '/lesson':     'chat',
+  '/profile':    'profile',
+};
+
 export default function App() {
   const screen = useAppStore(s => s.screen);
-  const login = useAppStore(s => s.login);
+  const login  = useAppStore(s => s.login);
   const setScreen = useAppStore(s => s.setScreen);
-  const theme = useAppStore(s => s.theme);
+  const theme  = useAppStore(s => s.theme);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Check for ?reset=TOKEN in URL on load
-  const [resetToken, setResetToken] = useState<string | null>(() => {
+  // Check for ?reset=TOKEN
+  const [resetToken] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('reset');
   });
 
-  // Apply theme class on mount and whenever theme changes
+  // Apply theme
   useEffect(() => {
     document.body.classList.toggle('light', theme === 'light');
   }, [theme]);
+
+  // On mount: if URL has a known path, set the store screen to match
+  useEffect(() => {
+    const mapped = PATH_TO_SCREEN[location.pathname];
+    if (mapped && mapped !== screen) {
+      // Only navigate to public screens from URL directly — protected ones need auth
+      if (mapped === 'home' || mapped === 'login') setScreen(mapped);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Whenever screen changes in store, update the URL
+  useEffect(() => {
+    const targetPath = SCREEN_TO_PATH[screen];
+    if (targetPath && location.pathname !== targetPath) {
+      navigate(targetPath, { replace: true });
+    }
+  }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (resetToken) {
     return (
       <div className="app">
         <ResetPasswordScreen token={resetToken} onDone={() => {
-          setResetToken(null);
-          window.history.replaceState({}, '', '/');
+          window.history.replaceState({}, '', '/login');
           setScreen('login');
         }} />
       </div>
     );
   }
 
+  // /signup goes to login screen with signup tab
+  const initialTab = location.pathname === '/signup' ? 'signup' : 'login';
+
   return (
     <div className="app">
-      {screen === 'home' && <HomeScreen onGetStarted={() => setScreen('login')} />}
-      {screen === 'login' && <LoginScreen onAuth={(user, token) => login(user, token)} />}
-      {screen === 'select' && <LanguageSelect />}
+      {screen === 'home'       && <HomeScreen onGetStarted={() => setScreen('login')} />}
+      {screen === 'login'      && <LoginScreen onAuth={(user, token) => login(user, token)} initialTab={initialTab as 'login' | 'signup'} />}
+      {screen === 'select'     && <LanguageSelect />}
       {screen === 'onboarding' && <OnboardingChat />}
-      {screen === 'path' && <LessonPath />}
-      {screen === 'chat' && <ConversationScreen />}
-      {screen === 'profile' && <ProfileScreen />}
+      {screen === 'path'       && <LessonPath />}
+      {screen === 'chat'       && <ConversationScreen />}
+      {screen === 'profile'    && <ProfileScreen />}
     </div>
   );
 }

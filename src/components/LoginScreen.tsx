@@ -1,12 +1,12 @@
 import { useState } from 'react';
 
 interface User { id: string; name: string; email: string; }
-interface Props { onAuth: (user: User, token: string) => void; }
+interface Props { onAuth: (user: User, token: string) => void; initialTab?: 'login' | 'signup'; }
 
 type View = 'auth' | 'forgot' | 'forgot-sent';
 
-export default function LoginScreen({ onAuth }: Props) {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+export default function LoginScreen({ onAuth, initialTab = 'login' }: Props) {
+  const [mode, setMode] = useState<'login' | 'signup'>(initialTab);
   const [view, setView] = useState<View>('auth');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
