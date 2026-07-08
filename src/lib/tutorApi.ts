@@ -5,6 +5,8 @@ const LANG_NAMES: Record<CourseId, string> = {
   'en-zh': 'Mandarin Chinese',
   'en-fr': 'French',
   'en-ja': 'Japanese',
+  'en-ko': 'Korean',
+  'en-de': 'German',
 };
 
 export interface TutorContext {

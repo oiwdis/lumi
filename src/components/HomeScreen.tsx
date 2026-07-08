@@ -1,3 +1,5 @@
+import { useAppStore } from '../store/useAppStore';
+
 interface Props { onGetStarted: () => void; }
 
 const FEATURES = [
@@ -43,6 +45,7 @@ const LANGUAGES = [
 ];
 
 export default function HomeScreen({ onGetStarted }: Props) {
+  const { theme, toggleTheme } = useAppStore();
   return (
     <div className="home-screen">
       {/* Nav */}
@@ -51,7 +54,10 @@ export default function HomeScreen({ onGetStarted }: Props) {
           <span>🌱</span>
           <span className="home-nav-name">Lumi</span>
         </div>
-        <button className="home-nav-login" onClick={onGetStarted}>Log in</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '☀️' : '🌙'}</button>
+          <button className="home-nav-login" onClick={onGetStarted}>Log in</button>
+        </div>
       </nav>
 
       {/* Hero */}

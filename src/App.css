@@ -23,6 +23,16 @@
   --radius-lg:  22px;
 }
 
+/* Light theme overrides */
+body.light {
+  --bg:       #f5f7fa;
+  --surface:  #ffffff;
+  --surface2: #edf0f5;
+  --border:   #d8dde6;
+  --text:     #0f1923;
+  --muted:    #7a8a9a;
+}
+
 body {
   font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif;
   background: var(--bg);
@@ -30,6 +40,20 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Theme toggle button */
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 5px 8px;
+  line-height: 1;
+  transition: border-color .15s;
+}
+.theme-toggle:hover { border-color: var(--muted); }
 
 .app {
   max-width: 500px;
@@ -1858,6 +1882,10 @@ input { font-family: inherit; }
 .login-submit:active:not(:disabled) { transform: translateY(0); }
 .login-submit:disabled { opacity: .45; cursor: default; }
 
+.login-forgot { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; text-align: right; padding: 0; text-decoration: underline; }
+.login-forgot:hover { color: var(--text); }
+.login-success { color: #4ade80; font-size: 13px; text-align: center; }
+
 /* Dashboard user / logout */
 .dash-header-right { display: flex; align-items: center; gap: 8px; }
 .dash-user-name { font-size: 13px; color: var(--text-muted); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2650,6 +2678,14 @@ input { font-family: inherit; }
   transition: background .3s;
 }
 .dl-progress-track .seg.filled { background: var(--lumi); }
+
+.dl-progress-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 /* Energy bolts (lives) — NOT hearts */
 .dl-hearts {

@@ -897,6 +897,7 @@ export default function ConversationScreen() {
               <div key={i} className={`seg ${i < ls.idx ? 'filled' : ''}`} />
             ))}
           </div>
+          <span className="dl-progress-count">{ls.idx + 1}/{total}</span>
           <div className="dl-hearts">
             {Array.from({ length: 3 }).map((_, i) => (
               <span key={i} className={i < ls.hearts ? 'heart-full' : 'heart-empty'}>⚡</span>

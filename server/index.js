@@ -28,15 +28,21 @@ if (process.env.DATABASE_URL) {
 
   pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id          TEXT PRIMARY KEY,
-      name        TEXT NOT NULL,
-      email       TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      created_at  BIGINT NOT NULL,
-      progress    JSONB
+      id                   TEXT PRIMARY KEY,
+      name                 TEXT NOT NULL,
+      email                TEXT UNIQUE NOT NULL,
+      password_hash        TEXT NOT NULL,
+      created_at           BIGINT NOT NULL,
+      progress             JSONB,
+      reset_token          TEXT,
+      reset_token_expires  BIGINT
     )
-  `).then(() => console.log('PostgreSQL ready'))
-    .catch(err => console.error('DB init error:', err.message));
+  `).then(async () => {
+    // Add reset columns if they don't exist yet (for existing tables)
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires BIGINT`).catch(() => {});
+    console.log('PostgreSQL ready');
+  }).catch(err => console.error('DB init error:', err.message));
 }
 
 // ── Storage helpers ───────────────────────────────────────────────────────────
@@ -182,6 +188,79 @@ app.post('/api/progress', async (req, res) => {
     saveUsers(users);
   }
   res.json({ ok: true });
+});
+
+// Forgot password — generate token and send email via Resend
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = Date.now() + 1000 * 60 * 60; // 1 hour
+
+  if (pool) {
+    const { rows } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (!rows[0]) return res.json({ ok: true }); // Don't reveal if email exists
+    await pool.query(
+      'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3',
+      [token, expires, email]
+    );
+  } else {
+    const users = loadUsers();
+    if (!users[email]) return res.json({ ok: true });
+    users[email].resetToken = token;
+    users[email].resetTokenExpires = expires;
+    saveUsers(users);
+  }
+
+  const resetUrl = `${process.env.APP_URL || 'https://lumilanguage.up.railway.app'}/?reset=${token}`;
+
+  if (process.env.RESEND_API_KEY) {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Lumi <noreply@lumilanguage.up.railway.app>',
+        to: email,
+        subject: 'Reset your Lumi password',
+        html: `<p>Hi! Click the link below to reset your Lumi password. This link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you didn't request this, you can ignore this email.</p>`,
+      }),
+    }).catch(err => console.error('Email send error:', err.message));
+  } else {
+    console.log(`[DEV] Password reset link for ${email}: ${resetUrl}`);
+  }
+
+  res.json({ ok: true });
+});
+
+// Reset password — validate token and update password
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Token and password required' });
+
+  const newHash = hash(password);
+
+  if (pool) {
+    const { rows } = await pool.query(
+      'SELECT email FROM users WHERE reset_token = $1 AND reset_token_expires > $2',
+      [token, Date.now()]
+    );
+    if (!rows[0]) return res.status(400).json({ error: 'Invalid or expired reset link' });
+    await pool.query(
+      'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE email = $2',
+      [newHash, rows[0].email]
+    );
+    return res.json({ ok: true });
+  } else {
+    const users = loadUsers();
+    const user = Object.values(users).find(u => u.resetToken === token && u.resetTokenExpires > Date.now());
+    if (!user) return res.status(400).json({ error: 'Invalid or expired reset link' });
+    users[user.email].passwordHash = newHash;
+    users[user.email].resetToken = null;
+    users[user.email].resetTokenExpires = null;
+    saveUsers(users);
+    return res.json({ ok: true });
+  }
 });
 
 // AI Tutor (streaming)

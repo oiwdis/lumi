@@ -10,7 +10,7 @@ const LANG_NAME: Record<string, string> = {
 };
 
 export default function LessonPath() {
-  const { selectedCourse, completedLessons, xp, streak, coins, customLessons, customGoal, goalSkipped, startLesson, goBack, logout, openProfile, openOnboarding } = useAppStore();
+  const { selectedCourse, completedLessons, xp, streak, coins, customLessons, customGoal, goalSkipped, theme, startLesson, goBack, logout, openProfile, openOnboarding, toggleTheme } = useAppStore();
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const langName = selectedCourse ? (LANG_NAME[selectedCourse] ?? 'Unknown') : '';
   const done = selectedCourse ? (completedLessons[selectedCourse] ?? []) : [];
@@ -41,6 +41,7 @@ export default function LessonPath() {
             <span className="path-flags">{course?.fromFlag} → {course?.toFlag}</span>
             <span className="path-lang-name">{langName}</span>
           </div>
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '☀️' : '🌙'}</button>
           <button className="path-logout-btn" onClick={logout}>Logout</button>
         </div>
         {/* Row 2: action buttons */}

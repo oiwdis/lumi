@@ -43,6 +43,7 @@ interface AuthUser { id: string; name: string; email: string; }
 
 interface AppStore {
   screen: Screen;
+  theme: 'dark' | 'light';
   user: AuthUser | null;
   selectedCourse: CourseId | null;
   currentLessonId: string | null;
@@ -56,6 +57,7 @@ interface AppStore {
   goalSkipped: Record<string, boolean>;
 
   setScreen: (screen: Screen) => void;
+  toggleTheme: () => void;
   login: (user: AuthUser, token?: string) => void;
   logout: () => void;
   setCourse: (c: CourseId) => void;
@@ -95,6 +97,7 @@ export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
       screen: initialScreen(),
+      theme: (() => { try { return (localStorage.getItem('lumi-theme') as 'dark' | 'light') ?? 'dark'; } catch { return 'dark'; } })(),
       user: (() => {
         try { const u = localStorage.getItem('lumi-user'); return u ? JSON.parse(u) : null; } catch { return null; }
       })(),
@@ -153,6 +156,13 @@ export const useAppStore = create<AppStore>()(
       },
 
       setScreen: (screen) => set({ screen }),
+
+      toggleTheme: () => {
+        const next = get().theme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('lumi-theme', next);
+        document.body.classList.toggle('light', next === 'light');
+        set({ theme: next });
+      },
 
       logout: () => {
         const s = get();
