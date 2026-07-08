@@ -216,6 +216,12 @@ export const useAppStore = create<AppStore>()(
 
       resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {}, coins: 0, customLessons: {}, customGoal: {} }),
     }),
-    { name: 'lumi-v2' }
+    {
+      name: 'lumi-v2',
+      partialize: (s) => {
+        const { screen: _screen, ...rest } = s;
+        return rest;
+      },
+    }
   )
 );
