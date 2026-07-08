@@ -33,7 +33,7 @@ function saveProgress(userId: string, p: UserProgress) {
   }
 }
 
-type Screen = 'login' | 'select' | 'onboarding' | 'path' | 'chat' | 'profile';
+type Screen = 'home' | 'login' | 'select' | 'onboarding' | 'path' | 'chat' | 'profile';
 
 export interface CustomWord { english: string; target: string; hint?: string; reading?: string; }
 export interface CustomLesson { id: string; title: string; emoji: string; words: CustomWord[]; }
@@ -54,6 +54,7 @@ interface AppStore {
   customLessons: Record<string, CustomUnit[]>;
   customGoal: Record<string, string>;
 
+  setScreen: (screen: Screen) => void;
   login: (user: AuthUser, token?: string) => void;
   logout: () => void;
   setCourse: (c: CourseId) => void;
@@ -88,7 +89,7 @@ export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
       screen: (() => {
-        try { return localStorage.getItem('lumi-user') ? 'select' : 'login'; } catch { return 'login'; }
+        try { return localStorage.getItem('lumi-user') ? 'select' : 'home'; } catch { return 'home'; }
       })() as Screen,
       user: (() => {
         try { const u = localStorage.getItem('lumi-user'); return u ? JSON.parse(u) : null; } catch { return null; }
@@ -147,12 +148,14 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
+      setScreen: (screen) => set({ screen }),
+
       logout: () => {
         const s = get();
         if (s.user) saveProgress(s.user.id, getFullProgress(s));
         localStorage.removeItem('lumi-token');
         localStorage.removeItem('lumi-user');
-        set({ user: null, screen: 'login', selectedCourse: null, currentLessonId: null,
+        set({ user: null, screen: 'home', selectedCourse: null, currentLessonId: null,
           completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, coins: 0,
           customLessons: {}, customGoal: {} });
       },
