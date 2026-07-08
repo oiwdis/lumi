@@ -7,30 +7,30 @@ const LANG_GREETING: Record<string, string> = {
 };
 
 // ── Mini-game word bank ───────────────────────────────────────────────────────
-// Each entry: english word + translations for all 4 languages
-const WORD_BANK: { en: string; es: string; fr: string; zh: string; zhR: string; ja: string; jaR: string }[] = [
-  { en: 'Hello',    es: 'Hola',       fr: 'Bonjour',   zh: '你好',  zhR: 'nǐ hǎo',    ja: 'こんにちは', jaR: 'konnichiwa' },
-  { en: 'Thank you',es: 'Gracias',    fr: 'Merci',     zh: '谢谢',  zhR: 'xiè xie',   ja: 'ありがとう', jaR: 'arigatou' },
-  { en: 'Yes',      es: 'Sí',         fr: 'Oui',       zh: '是',    zhR: 'shì',        ja: 'はい',      jaR: 'hai' },
-  { en: 'No',       es: 'No',         fr: 'Non',       zh: '不',    zhR: 'bù',         ja: 'いいえ',    jaR: 'iie' },
-  { en: 'Water',    es: 'Agua',       fr: 'Eau',       zh: '水',    zhR: 'shuǐ',       ja: '水',        jaR: 'mizu' },
-  { en: 'Food',     es: 'Comida',     fr: 'Nourriture',zh: '食物',  zhR: 'shí wù',     ja: '食べ物',    jaR: 'tabemono' },
-  { en: 'Friend',   es: 'Amigo',      fr: 'Ami',       zh: '朋友',  zhR: 'péngyǒu',   ja: '友達',      jaR: 'tomodachi' },
-  { en: 'Good',     es: 'Bueno',      fr: 'Bon',       zh: '好',    zhR: 'hǎo',        ja: 'いい',      jaR: 'ii' },
-  { en: 'Day',      es: 'Día',        fr: 'Jour',      zh: '天',    zhR: 'tiān',       ja: '日',        jaR: 'hi' },
-  { en: 'House',    es: 'Casa',       fr: 'Maison',    zh: '房子',  zhR: 'fángzi',     ja: '家',        jaR: 'ie' },
-  { en: 'Love',     es: 'Amor',       fr: 'Amour',     zh: '爱',    zhR: 'ài',         ja: '愛',        jaR: 'ai' },
-  { en: 'Beautiful',es: 'Bonito',    fr: 'Beau',      zh: '漂亮',  zhR: 'piàoliang',  ja: '綺麗',      jaR: 'kirei' },
-  { en: 'Cat',      es: 'Gato',       fr: 'Chat',      zh: '猫',    zhR: 'māo',        ja: '猫',        jaR: 'neko' },
-  { en: 'Dog',      es: 'Perro',      fr: 'Chien',     zh: '狗',    zhR: 'gǒu',        ja: '犬',        jaR: 'inu' },
-  { en: 'Sun',      es: 'Sol',        fr: 'Soleil',    zh: '太阳',  zhR: 'tài yáng',   ja: '太陽',      jaR: 'taiyou' },
+const WORD_BANK: { en: string; es: string; fr: string; de: string; zh: string; zhR: string; ja: string; jaR: string; ko: string; koR: string }[] = [
+  { en: 'Hello',     es: 'Hola',        fr: 'Bonjour',    de: 'Hallo',       zh: '你好',  zhR: 'nǐ hǎo',    ja: 'こんにちは', jaR: 'konnichiwa',  ko: '안녕하세요', koR: 'annyeonghaseyo' },
+  { en: 'Thank you', es: 'Gracias',     fr: 'Merci',      de: 'Danke',       zh: '谢谢',  zhR: 'xiè xie',   ja: 'ありがとう', jaR: 'arigatou',    ko: '감사합니다', koR: 'gamsahamnida' },
+  { en: 'Yes',       es: 'Sí',          fr: 'Oui',        de: 'Ja',          zh: '是',    zhR: 'shì',        ja: 'はい',      jaR: 'hai',         ko: '네',        koR: 'ne' },
+  { en: 'No',        es: 'No',          fr: 'Non',        de: 'Nein',        zh: '不',    zhR: 'bù',         ja: 'いいえ',    jaR: 'iie',         ko: '아니요',    koR: 'aniyo' },
+  { en: 'Water',     es: 'Agua',        fr: 'Eau',        de: 'Wasser',      zh: '水',    zhR: 'shuǐ',       ja: '水',        jaR: 'mizu',        ko: '물',        koR: 'mul' },
+  { en: 'Food',      es: 'Comida',      fr: 'Nourriture', de: 'Essen',       zh: '食物',  zhR: 'shí wù',     ja: '食べ物',    jaR: 'tabemono',    ko: '음식',      koR: 'eumsik' },
+  { en: 'Friend',    es: 'Amigo',       fr: 'Ami',        de: 'Freund',      zh: '朋友',  zhR: 'péngyǒu',   ja: '友達',      jaR: 'tomodachi',   ko: '친구',      koR: 'chingu' },
+  { en: 'Good',      es: 'Bueno',       fr: 'Bon',        de: 'Gut',         zh: '好',    zhR: 'hǎo',        ja: 'いい',      jaR: 'ii',          ko: '좋아요',    koR: 'joayo' },
+  { en: 'Day',       es: 'Día',         fr: 'Jour',       de: 'Tag',         zh: '天',    zhR: 'tiān',       ja: '日',        jaR: 'hi',          ko: '날',        koR: 'nal' },
+  { en: 'House',     es: 'Casa',        fr: 'Maison',     de: 'Haus',        zh: '房子',  zhR: 'fángzi',     ja: '家',        jaR: 'ie',          ko: '집',        koR: 'jip' },
+  { en: 'Love',      es: 'Amor',        fr: 'Amour',      de: 'Liebe',       zh: '爱',    zhR: 'ài',         ja: '愛',        jaR: 'ai',          ko: '사랑',      koR: 'sarang' },
+  { en: 'Beautiful', es: 'Bonito',      fr: 'Beau',       de: 'Schön',       zh: '漂亮',  zhR: 'piàoliang',  ja: '綺麗',      jaR: 'kirei',       ko: '예뻐요',    koR: 'yeppeoyo' },
+  { en: 'Cat',       es: 'Gato',        fr: 'Chat',       de: 'Katze',       zh: '猫',    zhR: 'māo',        ja: '猫',        jaR: 'neko',        ko: '고양이',    koR: 'goyangi' },
+  { en: 'Dog',       es: 'Perro',       fr: 'Chien',      de: 'Hund',        zh: '狗',    zhR: 'gǒu',        ja: '犬',        jaR: 'inu',         ko: '강아지',    koR: 'gangaji' },
+  { en: 'Sun',       es: 'Sol',         fr: 'Soleil',     de: 'Sonne',       zh: '太阳',  zhR: 'tài yáng',   ja: '太陽',      jaR: 'taiyou',      ko: '태양',      koR: 'taeyang' },
 ];
 
-type LangKey = 'es' | 'fr' | 'zh' | 'ja';
+type LangKey = 'es' | 'fr' | 'de' | 'zh' | 'ja' | 'ko';
 
 function getTranslation(word: (typeof WORD_BANK)[0], lang: LangKey): string {
   if (lang === 'zh') return `${word.zh}  ${word.zhR}`;
   if (lang === 'ja') return `${word.ja}  ${word.jaR}`;
+  if (lang === 'ko') return `${word.ko}  ${word.koR}`;
   return word[lang];
 }
 
@@ -46,9 +46,12 @@ function shuffle<T>(arr: T[]): T[] {
 // ── LoadingGame component ─────────────────────────────────────────────────────
 
 function LoadingGame({ lang }: { lang: string }) {
-  const langKey = (
-    lang === 'Spanish' ? 'es' : lang === 'French' ? 'fr' : lang === 'Chinese' ? 'zh' : 'ja'
-  ) as LangKey;
+  const langKey: LangKey =
+    lang === 'Spanish' ? 'es' :
+    lang === 'French'  ? 'fr' :
+    lang === 'Chinese' ? 'zh' :
+    lang === 'Korean'  ? 'ko' :
+    lang === 'German'  ? 'de' : 'ja';
 
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
