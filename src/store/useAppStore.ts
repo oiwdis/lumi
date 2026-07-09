@@ -7,7 +7,6 @@ interface UserProgress {
   xp: number;
   streak: number;
   lastSessionDate: string | null;
-  coins: number;
   customLessons: Record<string, CustomUnit[]>;
   customGoal: Record<string, string>;
   goalSkipped: Record<string, boolean>;
@@ -16,9 +15,9 @@ interface UserProgress {
 function loadProgress(userId: string): UserProgress {
   try {
     const saved = localStorage.getItem(`lumi-progress-${userId}`);
-    const base: UserProgress = { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, coins: 0, customLessons: {}, customGoal: {}, goalSkipped: {} };
+    const base: UserProgress = { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, customLessons: {}, customGoal: {}, goalSkipped: {} };
     return saved ? { ...base, ...JSON.parse(saved) } : base;
-  } catch { return { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, coins: 0, customLessons: {}, customGoal: {}, goalSkipped: {} }; }
+  } catch { return { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, customLessons: {}, customGoal: {}, goalSkipped: {} }; }
 }
 
 function saveProgress(userId: string, p: UserProgress) {
@@ -51,7 +50,6 @@ interface AppStore {
   xp: number;
   streak: number;
   lastSessionDate: string | null;
-  coins: number;
   customLessons: Record<string, CustomUnit[]>;
   customGoal: Record<string, string>;
   goalSkipped: Record<string, boolean>;
@@ -65,7 +63,6 @@ interface AppStore {
   completeLesson: () => void;
   goBack: () => void;
   addXp: (amount: number) => void;
-  addCoins: (amount: number) => void;
   openProfile: () => void;
   openOnboarding: (c: CourseId) => void;
   setCustomLessons: (courseId: string, units: CustomUnit[], goal: string) => void;
@@ -82,7 +79,6 @@ function getFullProgress(state: AppStore): UserProgress {
   return {
     completedLessons: state.completedLessons,
     xp: state.xp, streak: state.streak, lastSessionDate: state.lastSessionDate,
-    coins: state.coins,
     customLessons: state.customLessons,
     customGoal: state.customGoal,
     goalSkipped: state.goalSkipped,
@@ -107,7 +103,6 @@ export const useAppStore = create<AppStore>()(
       xp: 0,
       streak: 0,
       lastSessionDate: null,
-      coins: 0,
       customLessons: {},
       customGoal: {},
       goalSkipped: {},
@@ -116,7 +111,7 @@ export const useAppStore = create<AppStore>()(
         const localProgress = loadProgress(user.id);
         localStorage.setItem('lumi-user', JSON.stringify(user));
         if (user.email === 'elliot@themaclan.com') {
-          const adminProgress: UserProgress = { ...localProgress, xp: 9999, coins: 99999, streak: 999 };
+          const adminProgress: UserProgress = { ...localProgress, xp: 9999, streak: 999 };
           saveProgress(user.id, adminProgress);
           set({ user, screen: 'select', ...adminProgress });
           return;
@@ -132,7 +127,6 @@ export const useAppStore = create<AppStore>()(
               const base = getFullProgress(current);
               const merged: UserProgress = {
                 xp: Math.max(base.xp, serverProgress.xp ?? 0),
-                coins: Math.max(base.coins, serverProgress.coins ?? 0),
                 streak: Math.max(base.streak, serverProgress.streak ?? 0),
                 lastSessionDate: base.lastSessionDate ?? serverProgress.lastSessionDate,
                 completedLessons: (() => {
@@ -170,7 +164,7 @@ export const useAppStore = create<AppStore>()(
         localStorage.removeItem('lumi-token');
         localStorage.removeItem('lumi-user');
         set({ user: null, screen: 'home', selectedCourse: null, currentLessonId: null,
-          completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, coins: 0,
+          completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null,
           customLessons: {}, customGoal: {}, goalSkipped: {} });
       },
 
@@ -190,7 +184,6 @@ export const useAppStore = create<AppStore>()(
         const s = get();
         const newCustomLessons = { ...s.customLessons, [courseId]: units };
         const newCustomGoal = { ...s.customGoal, [courseId]: goal };
-        // Clear the skipped flag since they now have a goal
         const newSkipped = { ...s.goalSkipped, [courseId]: false };
         if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), customLessons: newCustomLessons, customGoal: newCustomGoal, goalSkipped: newSkipped });
         set({ customLessons: newCustomLessons, customGoal: newCustomGoal, goalSkipped: newSkipped, screen: 'path' });
@@ -208,10 +201,9 @@ export const useAppStore = create<AppStore>()(
             newCompleted = { ...s.completedLessons, [s.selectedCourse]: [...done, s.currentLessonId] };
           }
         }
-        const newCoins = s.coins + 50;
-        const updated = { ...getFullProgress(s), completedLessons: newCompleted, coins: newCoins };
+        const updated = { ...getFullProgress(s), completedLessons: newCompleted };
         if (s.user) saveProgress(s.user.id, updated);
-        set({ completedLessons: newCompleted, coins: newCoins, screen: 'path', currentLessonId: null });
+        set({ completedLessons: newCompleted, screen: 'path', currentLessonId: null });
       },
 
       goBack: () => {
@@ -228,29 +220,19 @@ export const useAppStore = create<AppStore>()(
         const newStreak = s.lastSessionDate === yesterday() ? s.streak + 1
           : s.lastSessionDate === todayStr ? s.streak : 1;
         const newXp = s.xp + amount;
-        const newCoins = s.coins + Math.floor(amount / 4);
-        set({ xp: newXp, streak: newStreak, lastSessionDate: todayStr, coins: newCoins });
-        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), xp: newXp, streak: newStreak, lastSessionDate: todayStr, coins: newCoins });
+        set({ xp: newXp, streak: newStreak, lastSessionDate: todayStr });
+        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), xp: newXp, streak: newStreak, lastSessionDate: todayStr });
       },
 
-      addCoins: (amount) => {
-        const s = get();
-        const newCoins = s.coins + amount;
-        set({ coins: newCoins });
-        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), coins: newCoins });
-      },
-
-      resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {}, coins: 0, customLessons: {}, customGoal: {}, goalSkipped: {} }),
+      resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {}, customLessons: {}, customGoal: {}, goalSkipped: {} }),
     }),
     {
       name: 'lumi-v2',
       partialize: (s) => {
-        // Never persist screen — always recompute on load based on lumi-user
         const { screen: _screen, ...rest } = s;
         return rest;
       },
       onRehydrateStorage: () => () => {
-        // After rehydration, force screen to correct value based on auth state
         useAppStore.setState({ screen: initialScreen() });
       },
     }

@@ -260,8 +260,6 @@ export default function ConversationScreen() {
   const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
   const showReadings = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
 
-  // Track coins earned during this lesson session
-  const lessonCoinsRef = useRef(0);
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const ttsLang = selectedCourse ? TTS_LANG[selectedCourse] : 'es-ES';
   const langName = selectedCourse ? LANG_NAME[selectedCourse] : 'Spanish';
@@ -339,7 +337,7 @@ export default function ConversationScreen() {
     setTopic(t);
     setLs(initExercise(state));
     setChatMessages([]);
-    lessonCoinsRef.current = 0;
+
     setScreen('lesson');
   }, [allWords, langName]);
 
@@ -367,7 +365,6 @@ export default function ConversationScreen() {
     const newScore = correct ? ls.score + 1 : ls.score;
     setLs(prev => prev ? { ...prev, checked: true, correct, hearts: newHearts, score: newScore } : prev);
     const xpAmt = correct ? 20 : 5;
-    lessonCoinsRef.current += Math.floor(xpAmt / 4);
     addXp(xpAmt);
 
     // Push AI feedback into chat
@@ -436,7 +433,7 @@ export default function ConversationScreen() {
     if (matched) {
       const newMatched = [...ls.pairsMatched, leftVal, rightVal];
       const allDone = newMatched.length === ex.wordPairs.length * 2;
-      if (allDone) { lessonCoinsRef.current += Math.floor(30 / 4); addXp(30); }
+      if (allDone) { addXp(30); }
       setLs(prev => prev ? {
         ...prev,
         pairsMatched: newMatched,
@@ -455,7 +452,6 @@ export default function ConversationScreen() {
     const q = quiz.questions[quiz.idx];
     const correct = quiz.selected === q.correct;
     const newScore = correct ? quiz.score + 1 : quiz.score;
-    if (correct) lessonCoinsRef.current += Math.floor(15 / 4);
     addXp(correct ? 15 : 0);
     setQuiz(prev => prev ? { ...prev, checked: true, correct, score: newScore } : prev);
   }, [quiz, addXp]);
@@ -815,9 +811,6 @@ export default function ConversationScreen() {
     const score = ls ? ls.score : 0;
     const hearts = ls ? ls.hearts : 0;
     const pct100 = Math.round((score / totalEx) * 100);
-    const coinsFromAnswers = lessonCoinsRef.current;
-    const completionBonus = 50;
-    const totalCoins = coinsFromAnswers + completionBonus;
     return (
       <div className="conv-screen">
         <TopBar onBack={completeLesson} />
@@ -828,23 +821,6 @@ export default function ConversationScreen() {
             <div className="dl-stat"><span className="dl-stat-num">{score}/{totalEx}</span><span className="dl-stat-lbl">Lesson</span></div>
             <div className="dl-stat"><span className="dl-stat-num">{quizScore}/5</span><span className="dl-stat-lbl">🎯 Quiz</span></div>
             <div className="dl-stat"><span className="dl-stat-num">{hearts}⚡</span><span className="dl-stat-lbl">Energy</span></div>
-          </div>
-
-          {/* Coin breakdown */}
-          <div className="results-coins-card">
-            <div className="results-coins-title">🪙 Coins earned</div>
-            <div className="results-coin-row">
-              <span className="results-coin-label">Correct answers</span>
-              <span className="results-coin-val">+{coinsFromAnswers}</span>
-            </div>
-            <div className="results-coin-row">
-              <span className="results-coin-label">Lesson complete bonus</span>
-              <span className="results-coin-val">+{completionBonus}</span>
-            </div>
-            <div className="results-coin-total">
-              <span>Total</span>
-              <span className="results-coin-total-val">🪙 {totalCoins}</span>
-            </div>
           </div>
           {topic && (
             <div className="dl-words-review">

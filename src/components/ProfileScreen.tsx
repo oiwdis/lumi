@@ -4,7 +4,7 @@ import { COURSES } from '../data';
 import Avatar from './Avatar';
 
 export default function ProfileScreen() {
-  const { user, xp, coins, streak, completedLessons, goBack } = useAppStore();
+  const { user, xp, streak, completedLessons, goBack } = useAppStore();
   const level = getLevelForXp(xp);
   const next = getNextLevel(xp);
   const { earned, needed, pct } = xpProgressInLevel(xp);
@@ -51,10 +51,6 @@ export default function ProfileScreen() {
           <div className="profile-stat">
             <div className="profile-stat-val">🔥{streak}</div>
             <div className="profile-stat-lbl">Day streak</div>
-          </div>
-          <div className="profile-stat">
-            <div className="profile-stat-val" style={{ color: 'var(--amber)' }}>🪙{coins.toLocaleString()}</div>
-            <div className="profile-stat-lbl">Coins</div>
           </div>
           <div className="profile-stat">
             <div className="profile-stat-val">{totalLessons}</div>

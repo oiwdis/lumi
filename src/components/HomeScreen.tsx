@@ -26,7 +26,7 @@ const FEATURES = [
   {
     emoji: '🏆',
     title: 'Streaks & rewards',
-    desc: 'Daily streaks, XP levels, and coins keep you coming back. Language learning is a marathon — Lumi makes it a game.',
+    desc: 'Daily streaks and XP levels keep you coming back. Language learning is a marathon — Lumi makes it a game.',
   },
   {
     emoji: '📱',
