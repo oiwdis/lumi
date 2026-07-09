@@ -43,7 +43,7 @@ export default function App() {
   const location = useLocation();
 
   // Check for ?reset=TOKEN
-  const [resetToken] = useState<string | null>(() => {
+  const [resetToken, setResetToken] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('reset');
   });
@@ -75,6 +75,7 @@ export default function App() {
     return (
       <div className="app">
         <ResetPasswordScreen token={resetToken} onDone={() => {
+          setResetToken(null);
           window.history.replaceState({}, '', '/login');
           setScreen('login');
         }} />
