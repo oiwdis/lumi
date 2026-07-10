@@ -84,6 +84,24 @@ body {
 }
 .theme-toggle:hover { border-color: var(--muted); }
 
+.global-theme-toggle {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 5px 8px;
+  line-height: 1;
+  transition: border-color .15s, background .15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.global-theme-toggle:hover { border-color: var(--muted); }
+
 .app {
   max-width: 500px;
   margin: 0 auto;

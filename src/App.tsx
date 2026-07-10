@@ -39,6 +39,9 @@ export default function App() {
   const login  = useAppStore(s => s.login);
   const setScreen = useAppStore(s => s.setScreen);
   const theme  = useAppStore(s => s.theme);
+  const toggleTheme = useAppStore(s => s.toggleTheme);
+  // Screens that have their own theme toggle built into their UI
+  const screensWithOwnToggle: typeof screen[] = ['home', 'path'];
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -88,6 +91,11 @@ export default function App() {
 
   return (
     <div className="app">
+      {!screensWithOwnToggle.includes(screen) && (
+        <button className="global-theme-toggle" onClick={toggleTheme} title="Toggle theme">
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+      )}
       {screen === 'home'       && <HomeScreen onGetStarted={() => setScreen('login')} />}
       {screen === 'login'      && <LoginScreen onAuth={(user, token) => login(user, token)} initialTab={initialTab as 'login' | 'signup'} onBack={() => setScreen('home')} />}
       {screen === 'select'     && <LanguageSelect />}
