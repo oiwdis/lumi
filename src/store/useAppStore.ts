@@ -28,16 +28,79 @@ function loadProgress(userId: string): UserProgress {
   } catch { return { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {} }; }
 }
 
+const SYNC_QUEUE_KEY = 'lumi-sync-pending';
+
+function flushSyncQueue() {
+  const token = localStorage.getItem('lumi-token');
+  if (!token) return;
+  const raw = localStorage.getItem(SYNC_QUEUE_KEY);
+  if (!raw) return;
+  const pending: UserProgress = JSON.parse(raw);
+  localStorage.removeItem(SYNC_QUEUE_KEY);
+  fetch('/api/progress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(pending),
+  }).catch(() => {
+    // Put it back if it fails again
+    localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(pending));
+  });
+}
+
+// Flush queued progress whenever we come back online
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', flushSyncQueue);
+}
+
 function saveProgress(userId: string, p: UserProgress) {
   localStorage.setItem(`lumi-progress-${userId}`, JSON.stringify(p));
   const token = localStorage.getItem('lumi-token');
-  if (token) {
-    fetch('/api/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify(p),
-    }).catch(() => {});
+  if (!token) return;
+  if (!navigator.onLine) {
+    // Queue latest snapshot; next flush will send it
+    localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(p));
+    return;
   }
+  fetch('/api/progress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(p),
+  }).catch(() => {
+    localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(p));
+  });
+}
+
+function mergeProgress(base: UserProgress, server: UserProgress): UserProgress {
+  // For wordStats: keep whichever entry has more total attempts or a later nextDue
+  const mergedWordStats: Record<string, WordStat> = { ...base.wordStats };
+  for (const [key, sv] of Object.entries(server.wordStats ?? {})) {
+    const bv = base.wordStats[key];
+    if (!bv) {
+      mergedWordStats[key] = sv;
+    } else {
+      const baseTotalAttempts = bv.correct + bv.wrong;
+      const serverTotalAttempts = sv.correct + sv.wrong;
+      mergedWordStats[key] = serverTotalAttempts >= baseTotalAttempts ? sv : bv;
+    }
+  }
+  return {
+    xp: Math.max(base.xp, server.xp ?? 0),
+    streak: Math.max(base.streak, server.streak ?? 0),
+    lastSessionDate: base.lastSessionDate ?? server.lastSessionDate,
+    completedLessons: (() => {
+      const out: Record<string, string[]> = { ...base.completedLessons };
+      for (const [c, ids] of Object.entries(server.completedLessons ?? {})) {
+        out[c] = [...new Set([...(out[c] ?? []), ...(ids as string[])])];
+      }
+      return out;
+    })(),
+    customLessons: Object.keys(server.customLessons ?? {}).length
+      ? server.customLessons
+      : base.customLessons,
+    customGoal: { ...base.customGoal, ...server.customGoal },
+    goalSkipped: { ...base.goalSkipped, ...(server.goalSkipped ?? {}) },
+    wordStats: mergedWordStats,
+  };
 }
 
 type Screen = 'home' | 'login' | 'select' | 'onboarding' | 'path' | 'chat' | 'profile';
@@ -73,6 +136,7 @@ interface AppStore {
   goBack: () => void;
   addXp: (amount: number) => void;
   recordAnswer: (courseId: string, wordTarget: string, correct: boolean) => void;
+  syncFromServer: () => void;
   openProfile: () => void;
   openOnboarding: (c: CourseId) => void;
   setCustomLessons: (courseId: string, units: CustomUnit[], goal: string) => void;
@@ -138,35 +202,37 @@ export const useAppStore = create<AppStore>()(
         set({ user, screen: 'select', ...localProgress });
         const authToken = token ?? localStorage.getItem('lumi-token');
         if (authToken) {
+          // Flush any queued offline progress first, then pull from server
+          flushSyncQueue();
           fetch('/api/progress', { headers: { 'Authorization': `Bearer ${authToken}` } })
             .then(r => r.ok ? r.json() : null)
             .then((serverProgress: UserProgress | null) => {
               if (!serverProgress) return;
               const current = useAppStore.getState();
-              const base = getFullProgress(current);
-              const merged: UserProgress = {
-                xp: Math.max(base.xp, serverProgress.xp ?? 0),
-                streak: Math.max(base.streak, serverProgress.streak ?? 0),
-                lastSessionDate: base.lastSessionDate ?? serverProgress.lastSessionDate,
-                completedLessons: (() => {
-                  const out: Record<string, string[]> = { ...base.completedLessons };
-                  for (const [c, ids] of Object.entries(serverProgress.completedLessons ?? {})) {
-                    out[c] = [...new Set([...(out[c] ?? []), ...(ids as string[])])];
-                  }
-                  return out;
-                })(),
-                customLessons: Object.keys(serverProgress.customLessons ?? {}).length
-                  ? serverProgress.customLessons
-                  : base.customLessons,
-                customGoal: { ...base.customGoal, ...serverProgress.customGoal },
-                goalSkipped: { ...base.goalSkipped, ...(serverProgress.goalSkipped ?? {}) },
-                wordStats: { ...base.wordStats, ...(serverProgress.wordStats ?? {}) },
-              };
+              const merged = mergeProgress(getFullProgress(current), serverProgress);
               saveProgress(user.id, merged);
               set(merged);
             })
             .catch(() => {});
         }
+      },
+
+      syncFromServer: () => {
+        const s = get();
+        if (!s.user) return;
+        const token = localStorage.getItem('lumi-token');
+        if (!token || !navigator.onLine) return;
+        flushSyncQueue();
+        fetch('/api/progress', { headers: { 'Authorization': `Bearer ${token}` } })
+          .then(r => r.ok ? r.json() : null)
+          .then((serverProgress: UserProgress | null) => {
+            if (!serverProgress) return;
+            const current = useAppStore.getState();
+            const merged = mergeProgress(getFullProgress(current), serverProgress);
+            saveProgress(current.user!.id, merged);
+            set(merged);
+          })
+          .catch(() => {});
       },
 
       setScreen: (screen) => set({ screen }),

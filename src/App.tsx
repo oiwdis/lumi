@@ -40,6 +40,7 @@ export default function App() {
   const setScreen = useAppStore(s => s.setScreen);
   const theme  = useAppStore(s => s.theme);
   const toggleTheme = useAppStore(s => s.toggleTheme);
+  const syncFromServer = useAppStore(s => s.syncFromServer);
   // Screens that have their own theme toggle built into their UI
   const screensWithOwnToggle: typeof screen[] = ['home', 'path', 'select', 'chat'];
   const navigate = useNavigate();
@@ -55,6 +56,13 @@ export default function App() {
   useEffect(() => {
     document.body.classList.toggle('light', theme === 'light');
   }, [theme]);
+
+  // Re-sync from server when tab becomes visible (handles multi-device use)
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') syncFromServer(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [syncFromServer]);
 
   // On mount: if URL has a known path, set the store screen to match
   useEffect(() => {
