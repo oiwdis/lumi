@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CourseId } from '../types';
 
+export interface WordStat {
+  correct: number;
+  wrong: number;
+  interval: number;   // days until next review
+  nextDue: number;    // timestamp ms
+}
+
 interface UserProgress {
   completedLessons: Record<string, string[]>;
   xp: number;
@@ -10,14 +17,15 @@ interface UserProgress {
   customLessons: Record<string, CustomUnit[]>;
   customGoal: Record<string, string>;
   goalSkipped: Record<string, boolean>;
+  wordStats: Record<string, WordStat>; // key: `${courseId}:${word.target}`
 }
 
 function loadProgress(userId: string): UserProgress {
   try {
     const saved = localStorage.getItem(`lumi-progress-${userId}`);
-    const base: UserProgress = { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, customLessons: {}, customGoal: {}, goalSkipped: {} };
+    const base: UserProgress = { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {} };
     return saved ? { ...base, ...JSON.parse(saved) } : base;
-  } catch { return { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, customLessons: {}, customGoal: {}, goalSkipped: {} }; }
+  } catch { return { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {} }; }
 }
 
 function saveProgress(userId: string, p: UserProgress) {
@@ -53,6 +61,7 @@ interface AppStore {
   customLessons: Record<string, CustomUnit[]>;
   customGoal: Record<string, string>;
   goalSkipped: Record<string, boolean>;
+  wordStats: Record<string, WordStat>;
 
   setScreen: (screen: Screen) => void;
   toggleTheme: () => void;
@@ -63,6 +72,7 @@ interface AppStore {
   completeLesson: () => void;
   goBack: () => void;
   addXp: (amount: number) => void;
+  recordAnswer: (courseId: string, wordTarget: string, correct: boolean) => void;
   openProfile: () => void;
   openOnboarding: (c: CourseId) => void;
   setCustomLessons: (courseId: string, units: CustomUnit[], goal: string) => void;
@@ -82,7 +92,15 @@ function getFullProgress(state: AppStore): UserProgress {
     customLessons: state.customLessons,
     customGoal: state.customGoal,
     goalSkipped: state.goalSkipped,
+    wordStats: state.wordStats,
   };
+}
+
+function nextInterval(stat: WordStat | undefined, correct: boolean): number {
+  if (!correct) return 1;
+  const prev = stat?.interval ?? 0;
+  // Double the interval each correct answer: 1 → 2 → 4 → 8 days, cap at 30
+  return Math.min(prev === 0 ? 1 : prev * 2, 30);
 }
 
 function initialScreen(): Screen {
@@ -106,6 +124,7 @@ export const useAppStore = create<AppStore>()(
       customLessons: {},
       customGoal: {},
       goalSkipped: {},
+      wordStats: {},
 
       login: (user, token?: string) => {
         const localProgress = loadProgress(user.id);
@@ -141,6 +160,7 @@ export const useAppStore = create<AppStore>()(
                   : base.customLessons,
                 customGoal: { ...base.customGoal, ...serverProgress.customGoal },
                 goalSkipped: { ...base.goalSkipped, ...(serverProgress.goalSkipped ?? {}) },
+                wordStats: { ...base.wordStats, ...(serverProgress.wordStats ?? {}) },
               };
               saveProgress(user.id, merged);
               set(merged);
@@ -165,7 +185,7 @@ export const useAppStore = create<AppStore>()(
         localStorage.removeItem('lumi-user');
         set({ user: null, screen: 'home', selectedCourse: null, currentLessonId: null,
           completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null,
-          customLessons: {}, customGoal: {}, goalSkipped: {} });
+          customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {} });
       },
 
       setCourse: (c) => set({ selectedCourse: c, screen: 'path' }),
@@ -206,6 +226,23 @@ export const useAppStore = create<AppStore>()(
         set({ completedLessons: newCompleted, screen: 'path', currentLessonId: null });
       },
 
+      recordAnswer: (courseId, wordTarget, correct) => {
+        const s = get();
+        const key = `${courseId}:${wordTarget}`;
+        const prev = s.wordStats[key];
+        const interval = nextInterval(prev, correct);
+        const nextDue = Date.now() + interval * 24 * 60 * 60 * 1000;
+        const updated: WordStat = {
+          correct: (prev?.correct ?? 0) + (correct ? 1 : 0),
+          wrong:   (prev?.wrong   ?? 0) + (correct ? 0 : 1),
+          interval,
+          nextDue,
+        };
+        const newStats = { ...s.wordStats, [key]: updated };
+        set({ wordStats: newStats });
+        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), wordStats: newStats });
+      },
+
       goBack: () => {
         const { screen } = get();
         if (screen === 'onboarding') set({ screen: 'select', selectedCourse: null });
@@ -224,7 +261,7 @@ export const useAppStore = create<AppStore>()(
         if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), xp: newXp, streak: newStreak, lastSessionDate: todayStr });
       },
 
-      resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {}, customLessons: {}, customGoal: {}, goalSkipped: {} }),
+      resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {}, customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {} }),
     }),
     {
       name: 'lumi-v2',

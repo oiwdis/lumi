@@ -256,7 +256,7 @@ async function fetchAIResponse(
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function ConversationScreen() {
-  const { selectedCourse, currentLessonId, user, xp, streak, customLessons, addXp, goBack, completeLesson, logout } = useAppStore();
+  const { selectedCourse, currentLessonId, user, xp, streak, customLessons, wordStats, addXp, recordAnswer, goBack, completeLesson, logout } = useAppStore();
   const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
   const showReadings = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
 
@@ -316,6 +316,21 @@ export default function ConversationScreen() {
   // Pool of all words for this language (for distractors)
   const allWords = topics.flatMap(t => t.words);
 
+  // Sort words by SRS priority: overdue words first, then new words, then recently seen
+  const sortBySrs = (words: Word[]): Word[] => {
+    const now = Date.now();
+    return [...words].sort((a, b) => {
+      const ka = `${selectedCourse}:${a.target}`;
+      const kb = `${selectedCourse}:${b.target}`;
+      const sa = wordStats[ka];
+      const sb = wordStats[kb];
+      // Never seen = highest priority (treat as maximally overdue)
+      const dueA = sa ? sa.nextDue : 0;
+      const dueB = sb ? sb.nextDue : 0;
+      return (dueA - now) - (dueB - now); // most overdue first
+    });
+  };
+
   // Look up pinyin/romaji for a target string (used to annotate MC options and pairs)
   const getReading = (target: string): string | undefined => {
     if (!showReadings) return undefined;
@@ -333,13 +348,13 @@ export default function ConversationScreen() {
 
   // ── start lesson ────────────────────────────────────────────────────────────
   const handleStartLesson = useCallback((t: Topic, m: Mode) => {
-    const state = initLesson(t, allWords, langName);
+    const srsWords = sortBySrs(t.words);
+    const state = initLesson({ ...t, words: srsWords }, allWords, langName);
     setTopic(t);
     setLs(initExercise(state));
     setChatMessages([]);
-
     setScreen('lesson');
-  }, [allWords, langName]);
+  }, [allWords, langName, sortBySrs]);
 
   // Auto-start lesson from the path immediately on mount
   useEffect(() => {
@@ -367,8 +382,9 @@ export default function ConversationScreen() {
     const xpAmt = correct ? 20 : 5;
     addXp(xpAmt);
 
-    // Push AI feedback into chat
+    // Record answer for spaced repetition
     const word = (ex as MCExercise | TypeExercise).word;
+    if (word && selectedCourse) recordAnswer(selectedCourse, word.target, correct);
     if (word) {
       const prompt = correct
         ? `Student correctly answered "${word.target}" (${word.english}) in ${langName}. Give ONE short encouraging sentence (max 12 words). No markdown.`

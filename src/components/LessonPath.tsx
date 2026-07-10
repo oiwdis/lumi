@@ -10,7 +10,7 @@ const LANG_NAME: Record<string, string> = {
 };
 
 export default function LessonPath() {
-  const { selectedCourse, completedLessons, xp, streak, customLessons, customGoal, goalSkipped, theme, startLesson, goBack, logout, openProfile, openOnboarding, toggleTheme } = useAppStore();
+  const { selectedCourse, completedLessons, xp, streak, customLessons, customGoal, goalSkipped, theme, wordStats, startLesson, goBack, logout, openProfile, openOnboarding, toggleTheme } = useAppStore();
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
   const langName = selectedCourse ? (LANG_NAME[selectedCourse] ?? 'Unknown') : '';
   const done = selectedCourse ? (completedLessons[selectedCourse] ?? []) : [];
@@ -27,6 +27,10 @@ export default function LessonPath() {
   const currentIdx = activeFlatLessons.findIndex(l => !done.includes(l.id));
   const currentGoal = selectedCourse ? (customGoal[selectedCourse] ?? null) : null;
   const hasSkipped = selectedCourse ? (goalSkipped[selectedCourse] ?? false) : false;
+
+  const dueCount = selectedCourse
+    ? Object.entries(wordStats).filter(([k, s]) => k.startsWith(`${selectedCourse}:`) && s.nextDue <= Date.now()).length
+    : 0;
 
   let flatIdx = 0;
 
@@ -86,6 +90,13 @@ export default function LessonPath() {
             <button className="path-goal-edit path-goal-edit--cta" onClick={() => selectedCourse && openOnboarding(selectedCourse)}>Set goal →</button>
           </div>
         ) : null}
+
+        {dueCount > 0 && (
+          <div className="path-srs-banner">
+            <span className="path-srs-icon">🔁</span>
+            <span className="path-srs-text">{dueCount} word{dueCount !== 1 ? 's' : ''} due for review — start any lesson to practise them first</span>
+          </div>
+        )}
 
         {activeUnits.map(unit => {
           const unitStart = flatIdx;
