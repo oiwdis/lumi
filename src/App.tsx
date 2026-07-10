@@ -41,6 +41,8 @@ export default function App() {
   const theme  = useAppStore(s => s.theme);
   const toggleTheme = useAppStore(s => s.toggleTheme);
   const syncFromServer = useAppStore(s => s.syncFromServer);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
   // Screens that have their own theme toggle built into their UI
   const screensWithOwnToggle: typeof screen[] = ['home', 'path', 'select', 'chat'];
   const navigate = useNavigate();
@@ -63,6 +65,18 @@ export default function App() {
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [syncFromServer]);
+
+  // Track online/offline status
+  useEffect(() => {
+    const onOnline  = () => { setIsOnline(true); setOfflineBannerDismissed(false); };
+    const onOffline = () => { setIsOnline(false); setOfflineBannerDismissed(false); };
+    window.addEventListener('online',  onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online',  onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   // On mount: if URL has a known path, set the store screen to match
   useEffect(() => {
@@ -99,6 +113,23 @@ export default function App() {
 
   return (
     <div className="app">
+      {!isOnline && !offlineBannerDismissed && (
+        <div className="offline-banner">
+          <div className="offline-banner-body">
+            <span className="offline-banner-icon">📶</span>
+            <div className="offline-banner-text">
+              <strong>You're offline</strong>
+              <span className="offline-banner-rows">
+                <span className="offline-row offline-row--ok">✓ Lessons &amp; exercises</span>
+                <span className="offline-row offline-row--ok">✓ Your progress &amp; stats</span>
+                <span className="offline-row offline-row--no">✗ AI chat tutor</span>
+                <span className="offline-row offline-row--no">✗ Sign in / sign up</span>
+              </span>
+            </div>
+          </div>
+          <button className="offline-banner-close" onClick={() => setOfflineBannerDismissed(true)}>✕</button>
+        </div>
+      )}
       {!screensWithOwnToggle.includes(screen) && (
         <button className="global-theme-toggle" onClick={toggleTheme} title="Toggle theme">
           {theme === 'dark' ? '☀️' : '🌙'}
