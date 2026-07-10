@@ -1964,6 +1964,11 @@ input { font-family: inherit; }
   height: 100vh;
   background: var(--bg);
   overflow: hidden;
+  position: relative;
+  max-width: 480px;
+  margin: 0 auto;
+  /* subtle frame on wide screens */
+  box-shadow: 0 0 0 1px var(--border), 0 8px 60px rgba(0,0,0,.35);
 }
 
 /* Top bar */
@@ -3359,7 +3364,7 @@ input { font-family: inherit; }
 
 /* Floating toggle button */
 .chat-fab {
-  position: fixed;
+  position: absolute;
   bottom: 96px;
   right: 20px;
   width: 50px;
@@ -3388,10 +3393,10 @@ input { font-family: inherit; }
 
 /* Chat panel */
 .chat-panel {
-  position: fixed;
+  position: absolute;
   bottom: 158px;
   right: 16px;
-  width: min(480px, calc(100vw - 24px));
+  width: calc(100% - 32px);
   max-height: min(680px, calc(100vh - 180px));
   background: var(--surface);
   border: 1px solid var(--border);

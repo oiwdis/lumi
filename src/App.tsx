@@ -41,7 +41,7 @@ export default function App() {
   const theme  = useAppStore(s => s.theme);
   const toggleTheme = useAppStore(s => s.toggleTheme);
   // Screens that have their own theme toggle built into their UI
-  const screensWithOwnToggle: typeof screen[] = ['home', 'path', 'select'];
+  const screensWithOwnToggle: typeof screen[] = ['home', 'path', 'select', 'chat'];
   const navigate = useNavigate();
   const location = useLocation();
 

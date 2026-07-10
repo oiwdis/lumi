@@ -256,7 +256,7 @@ async function fetchAIResponse(
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function ConversationScreen() {
-  const { selectedCourse, currentLessonId, user, xp, streak, customLessons, wordStats, addXp, recordAnswer, goBack, completeLesson, logout } = useAppStore();
+  const { selectedCourse, currentLessonId, user, xp, streak, customLessons, wordStats, theme, addXp, recordAnswer, goBack, completeLesson, logout, toggleTheme } = useAppStore();
   const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
   const showReadings = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
 
@@ -627,6 +627,7 @@ export default function ConversationScreen() {
           </div>
         )}
         <span className="conv-streak">🔥{streak}</span>
+        <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '☀️' : '🌙'}</button>
         <button className="conv-logout-btn" onClick={() => { window.speechSynthesis?.cancel(); logout(); }}>Logout</button>
       </div>
     </div>
