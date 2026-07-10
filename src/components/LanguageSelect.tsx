@@ -3,11 +3,12 @@ import { useAppStore } from '../store/useAppStore';
 import type { CourseId } from '../types';
 
 export default function LanguageSelect() {
-  const { openOnboarding, setCourse, customGoal, logout } = useAppStore();
+  const { openOnboarding, setCourse, customGoal, logout, theme, toggleTheme } = useAppStore();
 
   return (
     <div className="select-screen">
       <div className="select-topbar">
+        <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '☀️' : '🌙'}</button>
         <button className="select-logout-btn" onClick={logout}>Logout</button>
       </div>
       <div className="select-hero">
