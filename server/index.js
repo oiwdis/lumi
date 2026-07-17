@@ -159,6 +159,40 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Admin — list all users (only accessible by elliot@themaclan.com)
+app.get('/api/admin/users', async (req, res) => {
+  const auth = await getAuthUser(req);
+  if (!auth || auth.email !== 'elliot@themaclan.com') return res.status(403).json({ error: 'Forbidden' });
+
+  if (pool) {
+    const { rows } = await pool.query(
+      `SELECT id, name, email, created_at,
+              (progress->>'xp')::int        AS xp,
+              (progress->>'streak')::int    AS streak,
+              progress->>'lastSessionDate'  AS last_session
+       FROM users ORDER BY created_at DESC`
+    );
+    return res.json(rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      createdAt: new Date(Number(r.created_at)).toISOString(),
+      xp: r.xp ?? 0,
+      streak: r.streak ?? 0,
+      lastSession: r.last_session ?? null,
+    })));
+  }
+
+  // Local fallback
+  const users = loadUsers();
+  return res.json(Object.values(users).map(u => ({
+    id: u.id, name: u.name, email: u.email,
+    createdAt: u.created_at ? new Date(u.created_at).toISOString() : null,
+    xp: u.progress?.xp ?? 0, streak: u.progress?.streak ?? 0,
+    lastSession: u.progress?.lastSessionDate ?? null,
+  })));
+});
+
 // Progress — GET returns saved progress, POST saves it
 app.get('/api/progress', async (req, res) => {
   const auth = await getAuthUser(req);
