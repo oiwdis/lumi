@@ -1879,12 +1879,25 @@ input { font-family: inherit; }
 }
 
 .home-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
   text-align: center;
   padding: 24px;
   color: var(--muted);
   font-size: 13px;
   border-top: 1px solid var(--border);
 }
+
+/* Launch badge — intentionally low-key; brightens on hover */
+.home-footer-badge {
+  display: inline-flex;
+  opacity: .45;
+  transition: opacity .15s;
+}
+.home-footer-badge:hover { opacity: 1; }
+.home-footer-badge img { display: block; height: auto; }
 
 /* ─── Login / Signup ─────────────────────────────────────────────────────────── */
 

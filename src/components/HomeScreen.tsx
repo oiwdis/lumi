@@ -102,7 +102,22 @@ export default function HomeScreen({ onGetStarted }: Props) {
         <button className="home-cta-btn" onClick={onGetStarted}>Create your account →</button>
       </section>
 
-      <footer className="home-footer">© 2025 Lumi · AI language learning</footer>
+      <footer className="home-footer">
+        <span>© 2025 Lumi · AI language learning</span>
+        <a
+          className="home-footer-badge"
+          href="https://fazier.com/launches/lumilanguage.com"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <img
+            src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=dark"
+            width={104}
+            alt="Featured on Fazier"
+            loading="lazy"
+          />
+        </a>
+      </footer>
     </div>
   );
 }
