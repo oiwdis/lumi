@@ -1,35 +1,36 @@
+import { Target, Bot, Zap, Layers, Trophy, Smartphone } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 
 interface Props { onGetStarted: () => void; }
 
 const FEATURES = [
   {
-    emoji: '🎯',
+    icon: Target,
     title: 'Built around your goal',
     desc: 'Tell Lumi why you\'re learning — moving abroad, dating someone, travel — and it builds a curriculum just for you.',
   },
   {
-    emoji: '🤖',
+    icon: Bot,
     title: 'AI tutor in every lesson',
     desc: 'Stuck on a word? Ask Lumi mid-lesson. Get instant explanations, examples, and corrections in real time.',
   },
   {
-    emoji: '⚡',
+    icon: Zap,
     title: 'Adapts to your level',
     desc: 'Lessons match your level — beginner to advanced — and get harder as you improve.',
   },
   {
-    emoji: '🗂️',
+    icon: Layers,
     title: 'Four ways to learn',
     desc: 'Flashcards, multiple choice, typing, and word-pair matching — every lesson covers all the ways your brain actually retains things.',
   },
   {
-    emoji: '🏆',
+    icon: Trophy,
     title: 'Streaks & rewards',
     desc: 'Daily streaks and XP levels keep you coming back. Language learning is a marathon — Lumi makes it a game.',
   },
   {
-    emoji: '📱',
+    icon: Smartphone,
     title: 'Learn anywhere',
     desc: 'Progress syncs across every device. Pick up on your phone where you left off on your laptop.',
   },
@@ -62,7 +63,6 @@ export default function HomeScreen({ onGetStarted }: Props) {
 
       {/* Hero */}
       <section className="home-hero">
-        <div className="home-hero-badge">✨ AI-powered language learning</div>
         <h1 className="home-hero-title">
           Learn a language<br />
           <span className="home-hero-accent">built for you</span>
@@ -87,7 +87,7 @@ export default function HomeScreen({ onGetStarted }: Props) {
         <div className="home-feature-grid">
           {FEATURES.map(f => (
             <div key={f.title} className="home-feature-card">
-              <span className="home-feature-emoji">{f.emoji}</span>
+              <f.icon className="home-feature-icon" size={26} strokeWidth={2} />
               <h3 className="home-feature-title">{f.title}</h3>
               <p className="home-feature-desc">{f.desc}</p>
             </div>
