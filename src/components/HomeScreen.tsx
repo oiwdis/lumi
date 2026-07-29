@@ -114,7 +114,6 @@ export default function HomeScreen({ onGetStarted }: Props) {
             src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=dark"
             width={104}
             alt="Featured on Fazier"
-            loading="lazy"
           />
         </a>
       </footer>
