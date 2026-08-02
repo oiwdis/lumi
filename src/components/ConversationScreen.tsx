@@ -133,12 +133,77 @@ function checkType(input: string, ex: TypeExercise): boolean {
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 
-function speakWord(text: string, lang: string) {
-  if (!window.speechSynthesis) return;
+function speakWord(text: string, lang: string, onDone?: () => void) {
+  if (!window.speechSynthesis) { onDone?.(); return; }
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang; u.volume = 1; u.rate = 0.8;
+  if (onDone) {
+    let fired = false;
+    const finish = () => { if (fired) return; fired = true; onDone(); };
+    u.onend = finish;
+    u.onerror = finish;
+    // Safety net — some browsers never fire onend, which would leave the caller waiting forever
+    setTimeout(finish, Math.min(6000, 1200 + text.length * 130));
+  }
   window.speechSynthesis.speak(u);
+}
+
+// ── speech recognition ────────────────────────────────────────────────────────
+
+// This TS lib ships SpeechRecognitionEvent but no SpeechRecognition interface,
+// so declare just the surface we touch.
+interface SpeechRec {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onerror: ((e: { error: string }) => void) | null;
+  onnomatch: (() => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  abort(): void;
+}
+
+// ── pronunciation scoring ─────────────────────────────────────────────────────
+
+// Matches Han, Hiragana/Katakana and Hangul. Accent-folding must be skipped for
+// these scripts: NFD would split ga (が) into ka + a combining mark, and dropping
+// the mark changes the word.
+const CJK_RE = /[぀-ヿ㄰-㆏㐀-䶿一-鿿가-힯豈-﫿]/;
+
+function normalizeSpoken(s: string): string {
+  let out = s.toLowerCase();
+  if (!CJK_RE.test(out)) {
+    out = out.normalize('NFD').replace(/\p{M}+/gu, '');
+  }
+  // \p{P}/\p{S} strips punctuation without eating CJK characters the way [^\w\s] does
+  return out.replace(/[\p{P}\p{S}]+/gu, '').replace(/\s+/g, ' ').trim();
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(
+        prev[j] + 1,
+        row[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/** 1 = identical, 0 = nothing in common. */
+function similarity(a: string, b: string): number {
+  if (!a.length || !b.length) return 0;
+  return 1 - levenshtein(a, b) / Math.max(a.length, b.length);
 }
 
 // ── lesson state ──────────────────────────────────────────────────────────────
@@ -550,45 +615,93 @@ export default function ConversationScreen() {
   }, [ex, langName]);
 
   // ── pronunciation tap ─────────────────────────────────────────────────────────
+  const recognitionRef = useRef<SpeechRec | null>(null);
+  const pronounceTimerRef = useRef<number | null>(null);
+
+  // Never leave speech running after the screen goes away
+  useEffect(() => () => {
+    window.speechSynthesis?.cancel();
+    try { recognitionRef.current?.abort(); } catch { /* already stopped */ }
+    if (pronounceTimerRef.current !== null) window.clearTimeout(pronounceTimerRef.current);
+  }, []);
+
   const handlePronounce = useCallback((targetWord: string) => {
-    const SpeechRecognition = (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition
+    const SpeechRecognitionCtor = (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition
       || (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setPronounceRating({ label: 'Speech not supported in this browser', color: '#888' });
+    if (!SpeechRecognitionCtor) {
+      setPronounceRating({ label: 'Speaking practice needs Chrome, Edge, or Safari', color: 'var(--muted)' });
       return;
     }
+
+    // Tear down any previous attempt, so a second tap can't wedge the button
+    try { recognitionRef.current?.abort(); } catch { /* already stopped */ }
+    if (pronounceTimerRef.current !== null) window.clearTimeout(pronounceTimerRef.current);
+
     setPronouncing(true);
     setPronounceRating(null);
-    // Speak the word first so user knows what to say
-    speakWord(targetWord, ttsLang);
-    setTimeout(() => {
-      const rec = new (SpeechRecognition as new () => SpeechRecognition)();
+
+    // Play the word, then open the mic only once playback has actually finished.
+    // Starting sooner means the mic hears our own TTS instead of the learner.
+    speakWord(targetWord, ttsLang, () => {
+      const rec = new (SpeechRecognitionCtor as new () => SpeechRec)();
+      recognitionRef.current = rec;
       rec.lang = ttsLang;
       rec.interimResults = false;
-      rec.maxAlternatives = 3;
-      rec.onresult = (e: SpeechRecognitionEvent) => {
-        const heard = e.results[0][0].transcript.trim().toLowerCase();
-        const target = targetWord.toLowerCase();
-        const confidence = e.results[0][0].confidence;
-        // Simple similarity: check if heard matches or is close
-        const normalize = (s: string) => s.replace(/[^\w\s]/g, '').trim();
-        const match = normalize(heard) === normalize(target);
-        const partial = normalize(target).includes(normalize(heard)) || normalize(heard).includes(normalize(target));
-        let rating: { label: string; color: string };
-        if (match || (confidence > 0.85 && partial)) {
-          rating = { label: '✅ Perfect!', color: 'var(--emerald, #22c55e)' };
-        } else if (partial || confidence > 0.6) {
-          rating = { label: '🟡 Close — keep practicing', color: '#f59e0b' };
-        } else {
-          rating = { label: '🔴 Try again — listen first', color: '#ef4444' };
-        }
-        setPronounceRating(rating);
+      rec.maxAlternatives = 5;
+
+      let settled = false;
+      let timerId: number | null = null;
+      // A newer tap may have replaced this attempt; if so it must not touch shared UI state.
+      const settle = (label: string | null, color?: string) => {
+        if (settled) return;
+        settled = true;
+        if (timerId !== null) { window.clearTimeout(timerId); timerId = null; }
+        if (recognitionRef.current !== rec || label === null) return;
+        setPronounceRating({ label, color: color ?? 'var(--muted)' });
         setPronouncing(false);
       };
-      rec.onerror = () => { setPronounceRating({ label: '❌ Mic error — check permissions', color: '#888' }); setPronouncing(false); };
-      rec.onnomatch = () => { setPronounceRating({ label: "Couldn't hear that — try again", color: '#888' }); setPronouncing(false); };
-      rec.start();
-    }, 800);
+
+      rec.onresult = (e: SpeechRecognitionEvent) => {
+        const target = normalizeSpoken(targetWord);
+        // Score every alternative — the engine's top pick often isn't the closest one
+        let best = 0;
+        for (let i = 0; i < e.results[0].length; i++) {
+          best = Math.max(best, similarity(normalizeSpoken(e.results[0][i].transcript), target));
+        }
+        if (best >= 0.85)      settle('✅ Perfect!', 'var(--emerald)');
+        else if (best >= 0.5)  settle('🟡 Close — keep practicing', 'var(--amber)');
+        else                   settle('🔴 Try again — listen first', 'var(--red)');
+      };
+
+      rec.onerror = (e) => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          settle('Microphone blocked — allow mic access');
+        } else if (e.error === 'no-speech') {
+          settle("Didn't hear anything — try again");
+        } else if (e.error === 'aborted') {
+          settle(null); // we cancelled it on purpose — leave the UI to whoever did
+        } else {
+          settle(`Mic error (${e.error}) — try again`);
+        }
+      };
+
+      rec.onnomatch = () => settle("Couldn't make that out — try again");
+      // onend always fires, so the button can never stay stuck on "Listening…"
+      rec.onend = () => settle('Tap 🎤 to try again');
+
+      // Backstop in case the engine goes silent without ending
+      timerId = window.setTimeout(() => {
+        try { rec.abort(); } catch { /* already stopped */ }
+        settle('Timed out — tap 🎤 to try again');
+      }, 12000);
+      pronounceTimerRef.current = timerId;
+
+      try {
+        rec.start();
+      } catch {
+        settle('Could not start the mic — try again');
+      }
+    });
   }, [ttsLang]);
 
   // ── keyboard shortcut ─────────────────────────────────────────────────────────

@@ -23,6 +23,10 @@
   --radius:     14px;
   --radius-lg:  22px;
 
+  /* Width of the lesson content column. Widened at larger viewports in the
+     RESPONSIVE section at the end of this file. */
+  --lesson-col: 340px;
+
   /* Brand accent — used for marketing surfaces (home/login), not lesson feedback colors */
   --accent:        #E8A33C;
   --accent-dk:     #C9821F;
@@ -1397,7 +1401,7 @@ input { font-family: inherit; }
   flex-shrink: 0;
   background: var(--surface2);
   border: 1px solid var(--border);
-  color: var(--text-secondary);
+  color: var(--muted);
   border-radius: 8px;
   padding: 4px 10px;
   font-size: 14px;
@@ -2636,7 +2640,7 @@ input { font-family: inherit; }
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   width: 100%;
-  max-width: 340px;
+  max-width: var(--lesson-col);
 }
 .topic-card {
   display: flex;
@@ -2851,7 +2855,7 @@ input { font-family: inherit; }
   padding: 32px 24px;
   text-align: center;
   width: 100%;
-  max-width: 340px;
+  max-width: var(--lesson-col);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2931,7 +2935,7 @@ input { font-family: inherit; }
   flex-direction: column;
   gap: 10px;
   width: 100%;
-  max-width: 340px;
+  max-width: var(--lesson-col);
 }
 .dl-option {
   padding: 15px 20px;
@@ -2974,7 +2978,7 @@ input { font-family: inherit; }
   align-items: center;
   gap: 10px;
   width: 100%;
-  max-width: 340px;
+  max-width: var(--lesson-col);
 }
 .dl-type-input {
   width: 100%;
@@ -3029,7 +3033,7 @@ input { font-family: inherit; }
 .flash-dot--done { background: var(--lumi); opacity: 0.4; }
 .flash-card {
   width: 100%;
-  max-width: 340px;
+  max-width: var(--lesson-col);
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: 20px;
@@ -3078,7 +3082,7 @@ input { font-family: inherit; }
 .flash-speak-btn:hover { background: var(--surface); border-color: var(--lumi); transform: scale(1.08); }
 .flash-speak-btn:active { transform: scale(0.95); }
 
-.dl-pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 340px; }
+.dl-pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: var(--lesson-col); }
 .dl-pairs-col { display: flex; flex-direction: column; gap: 10px; }
 .dl-pair-btn {
   padding: 14px 10px;
@@ -3114,7 +3118,7 @@ input { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: 340px;
+  max-width: var(--lesson-col);
   margin: 0 auto;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -3148,7 +3152,7 @@ input { font-family: inherit; }
 /* Check button — indigo pill */
 .dl-check-btn {
   width: 100%;
-  max-width: 340px;
+  max-width: var(--lesson-col);
   padding: 15px;
   background: var(--lumi);
   border-radius: 14px;
@@ -3171,7 +3175,7 @@ input { font-family: inherit; }
 /* Continue button — emerald pill */
 .dl-continue-btn {
   width: 100%;
-  max-width: 340px;
+  max-width: var(--lesson-col);
   padding: 15px;
   background: var(--emerald);
   border-radius: 14px;
@@ -3214,7 +3218,7 @@ input { font-family: inherit; }
 .dl-stat-lbl { font-size: 11px; color: var(--muted); font-weight: 700; }
 .dl-words-review {
   width: 100%;
-  max-width: 340px;
+  max-width: var(--lesson-col);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -4266,3 +4270,126 @@ input { font-family: inherit; }
 }
 .path-srs-icon { font-size: 16px; flex-shrink: 0; }
 .path-srs-text { flex: 1; }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   Everything above is the phone layout. The rules below adapt it as the
+   viewport grows, so the app fits whatever it is opened on — and keeps
+   adapting when a desktop window is resized. Viewport-driven by design;
+   sniffing the user agent would miss tablets, split-screen and resizes.
+═══════════════════════════════════════════════════════════════ */
+
+/* Mobile browser chrome overlaps 100vh, which clipped the bottom of the
+   fixed-height screens. dvh measures the *visible* viewport instead. */
+@supports (height: 100dvh) {
+  body,
+  .app,
+  .select-screen,
+  .dashboard,
+  .session-screen,
+  .results-screen,
+  .home-screen,
+  .login-screen     { min-height: 100dvh; }
+
+  .conv-screen,
+  .path-screen,
+  .shop-screen,
+  .profile-screen,
+  .onboard-screen   { height: 100dvh; }
+}
+
+/* ─── Tablet / small laptop ─────────────────────────────────────────────────── */
+@media (min-width: 768px) {
+  .app { max-width: 900px; }
+
+  /* Lesson content column grows with the shell */
+  :root { --lesson-col: 460px; }
+  .conv-screen { max-width: 640px; }
+  .dl-exercise-area { padding: 28px 28px 16px; gap: 20px; }
+
+  /* Course picker reads better as a grid than a tall single column */
+  .course-list { display: grid; grid-template-columns: 1fr 1fr; }
+
+  .path-card-grid { grid-template-columns: repeat(3, 1fr); }
+  .path-scroll    { padding: 20px 24px 80px; }
+  .path-unit      { max-width: 860px; margin-inline: auto; }
+
+  /* Keep profile content from stretching the full shell width */
+  .profile-scroll { align-items: center; }
+  .profile-scroll > * { width: 100%; max-width: 680px; }
+
+  /* The in-lesson chat fills the width on phones; keep it a panel here
+     rather than letting it stretch across the whole lesson card. */
+  .chat-panel { width: min(420px, calc(100% - 32px)); }
+
+  /* Same for the standalone tutor: bottom sheet on phones, dialog here */
+  .tutor-overlay { align-items: center; }
+  .tutor-panel {
+    max-width: 560px;
+    height: min(78vh, 620px);
+    border-radius: 20px;
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* ─── Desktop ───────────────────────────────────────────────────────────────── */
+@media (min-width: 1200px) {
+  .app { max-width: 1160px; }
+
+  :root { --lesson-col: 560px; }
+  .conv-screen {
+    max-width: 840px;
+    /* Framed app card rather than a full-bleed phone column */
+    height: calc(100vh - 48px);
+    margin: 24px auto;
+    border-radius: 24px;
+    overflow: hidden;
+  }
+  /* Centre the exercise in the tall desktop card instead of stranding it at the
+     top. `safe` keeps the top reachable if the content ever overflows. */
+  .dl-exercise-area {
+    padding: 36px 36px 20px;
+    gap: 24px;
+    justify-content: safe center;
+  }
+  .dl-prompt-card   { padding: 40px 32px; }
+  .dl-prompt-word   { font-size: 48px; }
+  /* Four choices sit better two-up than in one long column */
+  .dl-options { display: grid; grid-template-columns: 1fr 1fr; }
+
+  .path-card-grid { grid-template-columns: repeat(4, 1fr); }
+  .path-scroll    { padding: 28px 32px 80px; }
+
+  .home-nav  { padding: 18px 40px; }
+  .home-hero { padding: 96px 24px 72px; }
+}
+
+@supports (height: 100dvh) {
+  @media (min-width: 1200px) {
+    .conv-screen { height: calc(100dvh - 48px); }
+  }
+}
+
+/* Once the shell is full-bleed, the floating theme toggle sits on top of the
+   onboarding "Skip" button — reserve room for it. */
+@media (max-width: 560px) {
+  .onboard-topbar { padding-right: 56px; }
+}
+
+/* ─── Small phones ──────────────────────────────────────────────────────────── */
+@media (max-width: 380px) {
+  .dl-exercise-area { padding: 14px 14px 10px; gap: 12px; }
+  .dl-prompt-card   { padding: 24px 18px; }
+  .dl-prompt-word   { font-size: 32px; }
+  .home-nav         { padding: 14px 18px; }
+}
+
+/* Respect users who ask for less motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
