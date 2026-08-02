@@ -290,15 +290,18 @@ function buildQuiz(topic: Topic, pool: Word[], langName: string): QuizState {
 
 // ── AI streaming helper ───────────────────────────────────────────────────────
 
+interface TutorTurn { role: 'user' | 'assistant'; content: string }
+
 async function fetchAIResponse(
   prompt: string, systemPrompt: string,
-  onChunk: (t: string) => void
+  onChunk: (t: string) => void,
+  history: TutorTurn[] = [],
 ): Promise<void> {
   try {
     const res = await fetch('/api/tutor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], systemPrompt }),
+      body: JSON.stringify({ messages: [...history, { role: 'user', content: prompt }], systemPrompt }),
     });
     if (!res.ok) return;
     const reader = res.body!.getReader();
@@ -603,6 +606,13 @@ export default function ConversationScreen() {
       systemPrompt = `You are Lumi, a friendly ${langName} tutor. ${lessonContext}Answer concisely (2-3 sentences). No markdown. Reference the current lesson words when relevant.`;
     }
 
+    // Send the conversation so far, so follow-ups like "what about the other one?"
+    // resolve against what was already said instead of arriving with no history.
+    const history: TutorTurn[] = chatMessages
+      .filter(m => m.text.trim())
+      .slice(-12)
+      .map(m => ({ role: m.role === 'ai' ? 'assistant' as const : 'user' as const, content: m.text }));
+
     const aiMsgId = String(++chatMsgIdRef.current);
     setChatMessages(prev => [...prev, { id: aiMsgId, role: 'ai', text: '' }]);
     setChatLoading(true);
@@ -610,9 +620,9 @@ export default function ConversationScreen() {
     await fetchAIResponse(prompt, systemPrompt, chunk => {
       accumulated += chunk;
       setChatMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulated } : m));
-    });
+    }, history);
     setChatLoading(false);
-  }, [ex, langName]);
+  }, [ex, topic, langName, chatMessages]);
 
   // ── pronunciation tap ─────────────────────────────────────────────────────────
   const recognitionRef = useRef<SpeechRec | null>(null);

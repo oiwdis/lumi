@@ -1868,8 +1868,12 @@ input { font-family: inherit; }
   text-align: center;
   gap: 12px;
   padding: 64px 24px;
+  margin: 0 20px 28px;
   background: var(--accent-soft);
-  border-top: 1px solid var(--border);
+  /* A rounded card — as a full-bleed band with square corners and a hard
+     top border it read as a stray box against the rest of the page. */
+  border: 1px solid var(--accent-border);
+  border-radius: 24px;
 }
 
 .home-cta-strip-title {

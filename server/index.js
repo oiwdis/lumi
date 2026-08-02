@@ -310,9 +310,12 @@ app.post('/api/tutor', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   try {
+    // max_tokens caps thinking AND response text together. At 512 the model
+    // could spend the whole budget thinking and emit no text at all — and since
+    // only text_delta is forwarded below, that surfaced as an empty reply.
     const stream = client.messages.stream({
       model: 'claude-opus-4-8',
-      max_tokens: 512,
+      max_tokens: 4096,
       thinking: { type: 'adaptive' },
       system: systemPrompt,
       messages,
@@ -384,13 +387,20 @@ Rules:
 - Learner experience level: ${level}. ${level === 'beginner' ? 'Use simple, short phrases. Avoid complex grammar. Prioritize survival vocabulary.' : level === 'intermediate' ? 'Use full sentences and introduce some grammar patterns. Learner knows basics already.' : 'Use natural, nuanced language. Include idiomatic expressions and complex structures.'}${readingNote ? '\n- ' + readingNote : ''}`;
 
   try {
-    const response = await client.messages.create({
+    // A full curriculum is thousands of tokens, and thinking counts against the
+    // same budget — 8000 could truncate the JSON mid-object, which surfaced as
+    // "malformed JSON". Streaming so the larger budget can't hit an HTTP timeout.
+    const response = await client.messages.stream({
       model: 'claude-opus-4-8',
-      max_tokens: 8000,
+      max_tokens: 32000,
       thinking: { type: 'adaptive' },
       system: systemPrompt,
       messages: [{ role: 'user', content: `Course: ${courseId}\nLearner's goal: ${goal}\nExperience level: ${level}` }],
-    });
+    }).finalMessage();
+
+    if (response.stop_reason === 'max_tokens') {
+      return res.status(500).json({ error: 'The plan was cut off before it finished. Please try again.' });
+    }
 
     const text = response.content.find(b => b.type === 'text')?.text ?? '';
     const stripped = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();

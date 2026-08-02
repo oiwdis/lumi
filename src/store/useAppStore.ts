@@ -18,14 +18,24 @@ interface UserProgress {
   customGoal: Record<string, string>;
   goalSkipped: Record<string, boolean>;
   wordStats: Record<string, WordStat>; // key: `${courseId}:${word.target}`
+  // When each course's goal was last changed, so a sync can tell which side is
+  // newer instead of assuming the server is. Missing entry = older than anything.
+  goalUpdatedAt: Record<string, number>;
+}
+
+function emptyProgress(): UserProgress {
+  return {
+    completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null,
+    customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {},
+    goalUpdatedAt: {},
+  };
 }
 
 function loadProgress(userId: string): UserProgress {
   try {
     const saved = localStorage.getItem(`lumi-progress-${userId}`);
-    const base: UserProgress = { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {} };
-    return saved ? { ...base, ...JSON.parse(saved) } : base;
-  } catch { return { completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null, customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {} }; }
+    return saved ? { ...emptyProgress(), ...JSON.parse(saved) } : emptyProgress();
+  } catch { return emptyProgress(); }
 }
 
 const SYNC_QUEUE_KEY = 'lumi-sync-pending';
@@ -37,14 +47,20 @@ function flushSyncQueue() {
   if (!raw) return;
   const pending: UserProgress = JSON.parse(raw);
   localStorage.removeItem(SYNC_QUEUE_KEY);
+  postProgress(token, pending);
+}
+
+// A rejected fetch is not the only way this fails — a 4xx/5xx resolves
+// normally, so check the status too or the snapshot is dropped silently.
+function postProgress(token: string, p: UserProgress) {
+  const requeue = () => localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(p));
   fetch('/api/progress', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify(pending),
-  }).catch(() => {
-    // Put it back if it fails again
-    localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(pending));
-  });
+    body: JSON.stringify(p),
+  })
+    .then(res => { if (!res.ok) requeue(); })
+    .catch(requeue);
 }
 
 // Flush queued progress whenever we come back online
@@ -61,13 +77,7 @@ function saveProgress(userId: string, p: UserProgress) {
     localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(p));
     return;
   }
-  fetch('/api/progress', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify(p),
-  }).catch(() => {
-    localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(p));
-  });
+  postProgress(token, p);
 }
 
 function mergeProgress(base: UserProgress, server: UserProgress): UserProgress {
@@ -94,13 +104,46 @@ function mergeProgress(base: UserProgress, server: UserProgress): UserProgress {
       }
       return out;
     })(),
-    customLessons: Object.keys(server.customLessons ?? {}).length
-      ? server.customLessons
-      : base.customLessons,
-    customGoal: { ...base.customGoal, ...server.customGoal },
-    goalSkipped: { ...base.goalSkipped, ...(server.goalSkipped ?? {}) },
+    // Goal state is merged per course, taking whichever side was edited last.
+    // Previously the server's copy replaced the local one outright, so a goal
+    // set on this device could be wiped by the next background sync before its
+    // POST had landed.
+    ...mergeGoals(base, server),
     wordStats: mergedWordStats,
   };
+}
+
+type GoalFields = Pick<UserProgress, 'customLessons' | 'customGoal' | 'goalSkipped' | 'goalUpdatedAt'>;
+
+function mergeGoals(base: UserProgress, server: UserProgress): GoalFields {
+  const out: GoalFields = {
+    customLessons: { ...base.customLessons },
+    customGoal: { ...base.customGoal },
+    goalSkipped: { ...base.goalSkipped },
+    goalUpdatedAt: { ...base.goalUpdatedAt },
+  };
+
+  const courses = new Set([
+    ...Object.keys(base.customLessons ?? {}), ...Object.keys(server.customLessons ?? {}),
+    ...Object.keys(base.customGoal ?? {}),    ...Object.keys(server.customGoal ?? {}),
+    ...Object.keys(base.goalSkipped ?? {}),   ...Object.keys(server.goalSkipped ?? {}),
+  ]);
+
+  for (const c of courses) {
+    const baseAt   = base.goalUpdatedAt?.[c] ?? 0;
+    const serverAt = server.goalUpdatedAt?.[c] ?? 0;
+    // Only let the server override when it is strictly newer. Ties and missing
+    // timestamps favour whatever this device already has.
+    const takeServer = serverAt > baseAt || (baseAt === 0 && serverAt === 0 && base.customLessons?.[c] === undefined);
+    if (!takeServer) continue;
+
+    if (server.customLessons?.[c] !== undefined) out.customLessons[c] = server.customLessons[c];
+    if (server.customGoal?.[c]    !== undefined) out.customGoal[c]    = server.customGoal[c];
+    if (server.goalSkipped?.[c]   !== undefined) out.goalSkipped[c]   = server.goalSkipped[c];
+    if (serverAt) out.goalUpdatedAt[c] = serverAt;
+  }
+
+  return out;
 }
 
 type Screen = 'home' | 'login' | 'select' | 'onboarding' | 'path' | 'chat' | 'profile';
@@ -125,6 +168,7 @@ interface AppStore {
   customGoal: Record<string, string>;
   goalSkipped: Record<string, boolean>;
   wordStats: Record<string, WordStat>;
+  goalUpdatedAt: Record<string, number>;
 
   setScreen: (screen: Screen) => void;
   toggleTheme: () => void;
@@ -157,6 +201,7 @@ function getFullProgress(state: AppStore): UserProgress {
     customGoal: state.customGoal,
     goalSkipped: state.goalSkipped,
     wordStats: state.wordStats,
+    goalUpdatedAt: state.goalUpdatedAt,
   };
 }
 
@@ -189,6 +234,7 @@ export const useAppStore = create<AppStore>()(
       customGoal: {},
       goalSkipped: {},
       wordStats: {},
+      goalUpdatedAt: {},
 
       login: (user, token?: string) => {
         const localProgress = loadProgress(user.id);
@@ -251,7 +297,7 @@ export const useAppStore = create<AppStore>()(
         localStorage.removeItem('lumi-user');
         set({ user: null, screen: 'home', selectedCourse: null, currentLessonId: null,
           completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null,
-          customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {} });
+          customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {}, goalUpdatedAt: {} });
       },
 
       setCourse: (c) => set({ selectedCourse: c, screen: 'path' }),
@@ -262,8 +308,9 @@ export const useAppStore = create<AppStore>()(
         const course = s.selectedCourse;
         if (!course) { set({ screen: 'path' }); return; }
         const newSkipped = { ...s.goalSkipped, [course]: true };
-        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), goalSkipped: newSkipped });
-        set({ goalSkipped: newSkipped, screen: 'path' });
+        const newStamps = { ...s.goalUpdatedAt, [course]: Date.now() };
+        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), goalSkipped: newSkipped, goalUpdatedAt: newStamps });
+        set({ goalSkipped: newSkipped, goalUpdatedAt: newStamps, screen: 'path' });
       },
 
       setCustomLessons: (courseId, units, goal) => {
@@ -271,8 +318,9 @@ export const useAppStore = create<AppStore>()(
         const newCustomLessons = { ...s.customLessons, [courseId]: units };
         const newCustomGoal = { ...s.customGoal, [courseId]: goal };
         const newSkipped = { ...s.goalSkipped, [courseId]: false };
-        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), customLessons: newCustomLessons, customGoal: newCustomGoal, goalSkipped: newSkipped });
-        set({ customLessons: newCustomLessons, customGoal: newCustomGoal, goalSkipped: newSkipped, screen: 'path' });
+        const newStamps = { ...s.goalUpdatedAt, [courseId]: Date.now() };
+        if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), customLessons: newCustomLessons, customGoal: newCustomGoal, goalSkipped: newSkipped, goalUpdatedAt: newStamps });
+        set({ customLessons: newCustomLessons, customGoal: newCustomGoal, goalSkipped: newSkipped, goalUpdatedAt: newStamps, screen: 'path' });
       },
 
       startLesson: (lessonId) => set({ currentLessonId: lessonId, screen: 'chat' }),
@@ -327,7 +375,7 @@ export const useAppStore = create<AppStore>()(
         if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), xp: newXp, streak: newStreak, lastSessionDate: todayStr });
       },
 
-      resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {}, customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {} }),
+      resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {}, customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {}, goalUpdatedAt: {} }),
     }),
     {
       name: 'lumi-v2',
