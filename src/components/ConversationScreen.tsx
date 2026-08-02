@@ -411,6 +411,9 @@ export default function ConversationScreen() {
     : [];
 
   const ex = ls ? ls.exercises[ls.idx] : null;
+  // Narrow dep for the tutor context — depending on all of `ls` would rebuild
+  // the chat callback on every keystroke of the type-answer input.
+  const flashIdx = ls?.flashIdx ?? 0;
   const total = ls ? ls.exercises.length : 1;
   const isLastExercise = ls ? ls.idx >= ls.exercises.length - 1 : false;
 
@@ -584,12 +587,28 @@ export default function ConversationScreen() {
       ? { target: (ex as MCExercise | TypeExercise).word.target, english: (ex as MCExercise | TypeExercise).word.english }
       : undefined;
 
+    // Describe exactly what is on screen. Pairs and flashcards have no single
+    // "current word", so without this the tutor could only see the lesson's
+    // whole word list and had to ask which one the student meant.
+    let onScreen = '';
+    if (ex?.kind === 'pairs') {
+      onScreen = `They are matching these pairs right now: ${ex.wordPairs.map(p => `"${p.target}" (${p.english})`).join(', ')}. `;
+    } else if (ex?.kind === 'flash') {
+      const card = ex.words[flashIdx];
+      if (card) onScreen = `They are on flashcard ${flashIdx + 1} of ${ex.words.length}: "${card.target}" (${card.english}). `;
+    } else if (currentWord) {
+      onScreen = `They are currently practising the word "${currentWord.target}" (${currentWord.english}). `;
+    }
+
+    const EXERCISE_LABEL = { mc: 'multiple choice', type: 'type the answer', pairs: 'match pairs', flash: 'flashcard review' };
+
     // Build lesson context so the AI always knows what's being studied
     const lessonContext = topic
       ? `The student is on the "${topic.title}" lesson (${topic.emoji}), learning ${langName} vocabulary. ` +
         `The words in this lesson are: ${topic.words.map(w => `"${w.target}" (${w.english})${w.hint ? ` [${w.hint}]` : ''}`).join(', ')}. ` +
-        (currentWord ? `They are currently practising the word "${currentWord.target}" (${currentWord.english}). ` : '') +
-        (ex ? `Exercise type: ${ex.kind === 'mc' ? 'multiple choice' : ex.kind === 'type' ? 'type the answer' : 'match pairs'}. ` : '')
+        onScreen +
+        (ex ? `Exercise type: ${EXERCISE_LABEL[ex.kind]}. ` : '') +
+        `If they ask for help without naming a word, help with what is on screen rather than asking them which word they mean. `
       : `The student is learning ${langName}. `;
 
     let prompt: string;
@@ -622,7 +641,7 @@ export default function ConversationScreen() {
       setChatMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulated } : m));
     }, history);
     setChatLoading(false);
-  }, [ex, topic, langName, chatMessages]);
+  }, [ex, flashIdx, topic, langName, chatMessages]);
 
   // ── pronunciation tap ─────────────────────────────────────────────────────────
   const recognitionRef = useRef<SpeechRec | null>(null);
