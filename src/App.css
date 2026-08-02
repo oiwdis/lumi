@@ -224,7 +224,9 @@ input { font-family: inherit; }
 .select-title {
   font-size: 44px;
   font-weight: 900;
-  color: var(--green);
+  background: linear-gradient(135deg, var(--accent), var(--accent-dk));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   letter-spacing: -1px;
   text-transform: lowercase;
 }
@@ -2908,6 +2910,29 @@ input { font-family: inherit; }
   font-style: italic;
   margin-left: 4px;
 }
+/* Listen / Speak pair — separate controls so tapping Speak starts the mic
+   inside the user gesture (required by Safari) instead of after playback. */
+.dl-speak-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.dl-listen-btn {
+  margin-top: 10px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.dl-listen-btn:hover { border-color: var(--muted); color: var(--text); }
+
 .dl-speak-btn {
   margin-top: 10px;
   padding: 6px 16px;

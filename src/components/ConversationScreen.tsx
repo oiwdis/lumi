@@ -629,7 +629,7 @@ export default function ConversationScreen() {
     const SpeechRecognitionCtor = (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition
       || (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
     if (!SpeechRecognitionCtor) {
-      setPronounceRating({ label: 'Speaking practice needs Chrome, Edge, or Safari', color: 'var(--muted)' });
+      setPronounceRating({ label: 'Speaking practice needs Chrome, Edge, or Safari 14.5+', color: 'var(--muted)' });
       return;
     }
 
@@ -637,12 +637,16 @@ export default function ConversationScreen() {
     try { recognitionRef.current?.abort(); } catch { /* already stopped */ }
     if (pronounceTimerRef.current !== null) window.clearTimeout(pronounceTimerRef.current);
 
+    // Silence any playback first — otherwise the mic records our own TTS
+    window.speechSynthesis?.cancel();
+
     setPronouncing(true);
     setPronounceRating(null);
 
-    // Play the word, then open the mic only once playback has actually finished.
-    // Starting sooner means the mic hears our own TTS instead of the learner.
-    speakWord(targetWord, ttsLang, () => {
+    // Everything below runs synchronously inside the click handler on purpose:
+    // Safari only allows start() while the user gesture is still active, so
+    // deferring it (behind a timer or a TTS callback) silently fails on iOS.
+    {
       const rec = new (SpeechRecognitionCtor as new () => SpeechRec)();
       recognitionRef.current = rec;
       rec.lang = ttsLang;
@@ -701,7 +705,7 @@ export default function ConversationScreen() {
       } catch {
         settle('Could not start the mic — try again');
       }
-    });
+    }
   }, [ttsLang]);
 
   // ── keyboard shortcut ─────────────────────────────────────────────────────────
@@ -1024,13 +1028,22 @@ export default function ConversationScreen() {
                 {showReadings && (ex.word?.reading || ex.word?.hint) && (
                   <div className="dl-prompt-reading">{ex.word.reading ?? ex.word.hint}</div>
                 )}
-                <button
-                  className={`dl-speak-btn ${pronouncing ? 'dl-speak-btn--active' : ''}`}
-                  onClick={() => handlePronounce(ex.word?.target ?? ex.prompt)}
-                  title="Tap to practice pronunciation"
-                >
-                  {pronouncing ? '🎙️ Listening…' : '🎤 Speak'}
-                </button>
+                <div className="dl-speak-row">
+                  <button
+                    className="dl-listen-btn"
+                    onClick={() => speakWord(ex.word?.target ?? ex.prompt, ttsLang)}
+                    title="Hear the word"
+                  >
+                    🔊 Listen
+                  </button>
+                  <button
+                    className={`dl-speak-btn ${pronouncing ? 'dl-speak-btn--active' : ''}`}
+                    onClick={() => handlePronounce(ex.word?.target ?? ex.prompt)}
+                    title="Tap, then say the word"
+                  >
+                    {pronouncing ? '🎙️ Listening…' : '🎤 Speak'}
+                  </button>
+                </div>
                 {pronounceRating && (
                   <div className="dl-pronounce-rating" style={{ color: pronounceRating.color }}>
                     {pronounceRating.label}
