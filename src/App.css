@@ -2952,6 +2952,13 @@ input { font-family: inherit; }
 .dl-speak-btn:hover { background: var(--lumi); color: #fff; }
 .dl-speak-btn--active { background: var(--lumi); color: #fff; animation: pulse-lumi 0.8s infinite; }
 @keyframes pulse-lumi { 0%,100% { opacity:1 } 50% { opacity:0.6 } }
+.dl-heard {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+  word-break: break-word;
+}
 .dl-pronounce-rating {
   margin-top: 8px;
   font-size: 14px;

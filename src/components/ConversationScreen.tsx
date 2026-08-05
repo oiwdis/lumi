@@ -155,13 +155,18 @@ function speakWord(text: string, lang: string, onDone?: () => void) {
 // so declare just the surface we touch.
 interface SpeechRec {
   lang: string;
+  continuous: boolean;
   interimResults: boolean;
   maxAlternatives: number;
+  onaudiostart: (() => void) | null;
+  onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
   onresult: ((e: SpeechRecognitionEvent) => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   onnomatch: (() => void) | null;
   onend: (() => void) | null;
   start(): void;
+  stop(): void;
   abort(): void;
 }
 
@@ -369,6 +374,8 @@ export default function ConversationScreen() {
   // Pronunciation state
   const [pronouncing, setPronouncing] = useState(false);
   const [pronounceRating, setPronounceRating] = useState<{ label: string; color: string } | null>(null);
+  // Live transcript, so the button is never just sitting there saying nothing
+  const [heardText, setHeardText] = useState('');
 
   // Chat state
   const [chatOpen, setChatOpen] = useState(false);
@@ -488,6 +495,7 @@ export default function ConversationScreen() {
       return;
     }
     setPronounceRating(null);
+    setHeardText('');
     const next = initExercise({ ...ls, idx: ls.idx + 1 });
     setLs(next);
     // Auto-focus input for type exercises
@@ -671,6 +679,7 @@ export default function ConversationScreen() {
 
     setPronouncing(true);
     setPronounceRating(null);
+    setHeardText('');
 
     // Everything below runs synchronously inside the click handler on purpose:
     // Safari only allows start() while the user gesture is still active, so
@@ -679,11 +688,20 @@ export default function ConversationScreen() {
       const rec = new (SpeechRecognitionCtor as new () => SpeechRec)();
       recognitionRef.current = rec;
       rec.lang = ttsLang;
-      rec.interimResults = false;
+      rec.continuous = false;
+      // Interim results give the learner live feedback, and give us something to
+      // score if the engine never delivers a final result (Chrome drops it when
+      // the round-trip to the speech service stalls).
+      rec.interimResults = true;
       rec.maxAlternatives = 5;
 
+      const target = normalizeSpoken(targetWord);
       let settled = false;
       let timerId: number | null = null;
+      let heardAudio = false;   // mic stream actually opened
+      let heardSpeech = false;  // engine detected talking, not just room noise
+      let interim = '';         // newest partial transcript, our fallback
+
       // A newer tap may have replaced this attempt; if so it must not touch shared UI state.
       const settle = (label: string | null, color?: string) => {
         if (settled) return;
@@ -694,39 +712,76 @@ export default function ConversationScreen() {
         setPronouncing(false);
       };
 
-      rec.onresult = (e: SpeechRecognitionEvent) => {
-        const target = normalizeSpoken(targetWord);
-        // Score every alternative — the engine's top pick often isn't the closest one
+      // Score every alternative — the engine's top pick often isn't the closest one
+      const score = (alternatives: string[]) => {
         let best = 0;
-        for (let i = 0; i < e.results[0].length; i++) {
-          best = Math.max(best, similarity(normalizeSpoken(e.results[0][i].transcript), target));
-        }
+        for (const alt of alternatives) best = Math.max(best, similarity(normalizeSpoken(alt), target));
         if (best >= 0.85)      settle('✅ Perfect!', 'var(--emerald)');
         else if (best >= 0.5)  settle('🟡 Close — keep practicing', 'var(--amber)');
         else                   settle('🔴 Try again — listen first', 'var(--red)');
       };
 
+      rec.onaudiostart = () => { heardAudio = true; };
+      rec.onspeechstart = () => { heardSpeech = true; };
+      // Chrome can hold the stream open long after the talking stops; stop() makes
+      // it commit to a final result instead of idling until our backstop fires.
+      rec.onspeechend = () => { try { rec.stop(); } catch { /* already stopping */ } };
+
+      rec.onresult = (e: SpeechRecognitionEvent) => {
+        heardSpeech = true;
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const result = e.results[i];
+          if (result.isFinal) {
+            const alternatives: string[] = [];
+            for (let j = 0; j < result.length; j++) alternatives.push(result[j].transcript);
+            setHeardText(alternatives[0] ?? '');
+            score(alternatives);
+            return;
+          }
+          interim = result[0].transcript;
+        }
+        if (interim) setHeardText(interim);
+      };
+
       rec.onerror = (e) => {
+        if (e.error === 'aborted') { settle(null); return; } // cancelled on purpose
+        // We already heard them — a transport failure shouldn't throw the attempt away
+        if (interim) { score([interim]); return; }
         if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-          settle('Microphone blocked — allow mic access');
+          settle('Microphone blocked — allow mic access for this site, then try again');
         } else if (e.error === 'no-speech') {
-          settle("Didn't hear anything — try again");
-        } else if (e.error === 'aborted') {
-          settle(null); // we cancelled it on purpose — leave the UI to whoever did
+          settle("Didn't hear anything — move closer to the mic and try again");
+        } else if (e.error === 'network') {
+          settle('Speech service unreachable — check your connection, or try another network');
         } else {
           settle(`Mic error (${e.error}) — try again`);
         }
       };
 
-      rec.onnomatch = () => settle("Couldn't make that out — try again");
-      // onend always fires, so the button can never stay stuck on "Listening…"
-      rec.onend = () => settle('Tap 🎤 to try again');
+      rec.onnomatch = () => {
+        if (interim) score([interim]);
+        else settle("Couldn't make that out — try again");
+      };
 
-      // Backstop in case the engine goes silent without ending
+      // onend always fires, so the button can never stay stuck on "Listening…"
+      rec.onend = () => {
+        if (interim) { score([interim]); return; }
+        if (!heardAudio) settle('The mic never opened — check this site\'s mic permission');
+        else if (heardSpeech) settle('Heard you, but the speech service sent nothing back — try again');
+        else settle('Tap 🎤 and say the word out loud');
+      };
+
+      // Backstop in case the engine goes silent without ending. stop() rather than
+      // abort() — stop still delivers whatever it has, abort throws it away.
       timerId = window.setTimeout(() => {
-        try { rec.abort(); } catch { /* already stopped */ }
-        settle('Timed out — tap 🎤 to try again');
-      }, 12000);
+        try { rec.stop(); } catch { /* already stopped */ }
+        window.setTimeout(() => {
+          if (interim) score([interim]);
+          else settle(heardAudio
+            ? 'Timed out — tap 🎤 to try again'
+            : 'The mic never opened — check this site\'s mic permission');
+        }, 800);
+      }, 10000);
       pronounceTimerRef.current = timerId;
 
       try {
@@ -1073,6 +1128,9 @@ export default function ConversationScreen() {
                     {pronouncing ? '🎙️ Listening…' : '🎤 Speak'}
                   </button>
                 </div>
+                {heardText && (
+                  <div className="dl-heard">Heard: “{heardText}”</div>
+                )}
                 {pronounceRating && (
                   <div className="dl-pronounce-rating" style={{ color: pronounceRating.color }}>
                     {pronounceRating.label}
