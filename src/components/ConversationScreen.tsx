@@ -4,6 +4,7 @@ import { COURSES, LANG_NAME } from '../data';
 import { TOPICS, type Topic, type Word } from '../data/lessonWords';
 import { LESSON_UNITS } from '../data/lessonPath';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
+import { authHeader } from '../lib/authHeader';
 import Avatar from './Avatar';
 import AIChat, { type ChatMessage } from './AIChat';
 
@@ -13,8 +14,6 @@ const TTS_LANG: Record<string, string> = {
   'en-es': 'es-ES', 'en-zh': 'zh-CN', 'en-fr': 'fr-FR', 'en-ja': 'ja-JP', 'en-ko': 'ko-KR', 'en-de': 'de-DE',
   'en-it': 'it-IT', 'en-pt': 'pt-BR',
 };
-
-type Mode = 'voice' | 'silent';
 
 interface MCExercise {
   kind: 'mc';
@@ -40,6 +39,7 @@ interface PairsExercise {
 }
 interface FlashExercise {
   kind: 'flash';
+  instruction: string;
   words: Word[];
 }
 type Exercise = MCExercise | TypeExercise | PairsExercise | FlashExercise;
@@ -64,7 +64,7 @@ function buildExercises(topic: Topic, pool: Word[], langName: string): Exercise[
   const ex: Exercise[] = [];
 
   // Flashcard intro — always first
-  ex.push({ kind: 'flash', words });
+  ex.push({ kind: 'flash', instruction: 'Learn these words', words });
 
   // Pairs exercise — second
   const pairWords = shuffle(words).slice(0, 4);
@@ -269,7 +269,7 @@ function initExercise(ls: LessonState): LessonState {
   return { ...ls, selected: null, typed: '', checked: false, correct: null, pairsLeft, pairsRight, pairsSelected: null, pairsMatched: [], pairsWrong: null, flashIdx: 0 };
 }
 
-function buildUnitQuiz(unitWords: Word[], pool: Word[], langName: string): QuizState {
+function buildUnitQuiz(unitWords: Word[], pool: Word[]): QuizState {
   const selected = shuffle(unitWords).slice(0, 10);
   const questions: MCExercise[] = selected.map(word => {
     const recognize = Math.random() > 0.5;
@@ -284,7 +284,7 @@ function buildUnitQuiz(unitWords: Word[], pool: Word[], langName: string): QuizS
   return { questions, idx: 0, score: 0, selected: null, checked: false, correct: null };
 }
 
-function buildQuiz(topic: Topic, pool: Word[], langName: string): QuizState {
+function buildQuiz(topic: Topic, pool: Word[]): QuizState {
   const words = topic.words;
   const questions: MCExercise[] = [];
   for (const word of shuffle(words)) {
@@ -312,10 +312,15 @@ async function fetchAIResponse(
   try {
     const res = await fetch('/api/tutor', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
       body: JSON.stringify({ messages: [...history, { role: 'user', content: prompt }], systemPrompt }),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      // Say why. Swallowing this left the tutor silently dead on 401/429.
+      const msg = await res.json().then(d => d.error).catch(() => null);
+      onChunk(msg ?? 'The tutor is unavailable right now — please try again.');
+      return;
+    }
     const reader = res.body!.getReader();
     const dec = new TextDecoder();
     for (;;) {
@@ -374,7 +379,6 @@ export default function ConversationScreen() {
   const [quizScore, setQuizScore] = useState(0);
   const [unitQuiz, setUnitQuiz] = useState<QuizState | null>(null);
   const [unitQuizScore, setUnitQuizScore] = useState(0);
-  const [mode] = useState<Mode>('silent');
   const [topic, setTopic] = useState<Topic | null>(null);
   const [ls, setLs] = useState<LessonState | null>(null);
 
@@ -432,7 +436,7 @@ export default function ConversationScreen() {
   const isLastExercise = ls ? ls.idx >= ls.exercises.length - 1 : false;
 
   // ── start lesson ────────────────────────────────────────────────────────────
-  const handleStartLesson = useCallback((t: Topic, m: Mode) => {
+  const handleStartLesson = useCallback((t: Topic) => {
     const srsWords = sortBySrs(t.words);
     const state = initLesson({ ...t, words: srsWords }, allWords, langName);
     setTopic(t);
@@ -444,7 +448,7 @@ export default function ConversationScreen() {
   // Auto-start lesson from the path immediately on mount
   useEffect(() => {
     if (currentTopic && !ls) {
-      handleStartLesson(currentTopic, 'silent');
+      handleStartLesson(currentTopic);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -484,14 +488,14 @@ export default function ConversationScreen() {
         setChatMessages(prev => prev.map(m => m.id === msgId ? { ...m, text: accumulated } : m));
       }).finally(() => setChatLoading(false));
     }
-  }, [ls, ex, langName, chatOpen, addXp]);
+  }, [ls, ex, langName, chatOpen, addXp, recordAnswer, selectedCourse]);
 
   // ── continue to next ─────────────────────────────────────────────────────────
   const handleContinue = useCallback(() => {
     if (!ls) return;
     if (isLastExercise) {
       if (topic) {
-        const q = buildQuiz(topic, allWords, langName);
+        const q = buildQuiz(topic, allWords);
         setQuiz(q);
         setQuizScore(0);
         setScreen('quiz');
@@ -508,7 +512,7 @@ export default function ConversationScreen() {
     if (ls.exercises[ls.idx + 1]?.kind === 'type') {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [ls, isLastExercise, topic, allWords, langName]);
+  }, [ls, isLastExercise, topic, allWords]);
 
   // ── pairs tap ────────────────────────────────────────────────────────────────
   const handlePairsTap = useCallback((side: 'left' | 'right', value: string) => {
@@ -569,7 +573,7 @@ export default function ConversationScreen() {
   }, [quiz]);
 
   // ── chat send (text or pronunciation) ────────────────────────────────────────
-  const handleChatSend = useCallback(async (text: string, isPronunciation: boolean) => {
+  const handleChatSend = useCallback(async (text: string, isPronunciation = false) => {
     const addAiMsg = (msg: string) => {
       const id = String(++chatMsgIdRef.current);
       setChatMessages(prev => [...prev, { id, role: 'ai', text: msg }]);
@@ -875,7 +879,6 @@ export default function ConversationScreen() {
       );
     }
     const qex = quiz.questions[quiz.idx];
-    const qProgress = quiz.idx / quiz.questions.length;
     const canCheck = !quiz.checked && quiz.selected !== null;
     const isLastQ = quiz.idx >= quiz.questions.length - 1;
 
@@ -1061,7 +1064,7 @@ export default function ConversationScreen() {
           )}
           <button className="dl-continue-btn" onClick={() => {
             if (isLastInUnit && unitWords.length >= 4) {
-              const q = buildUnitQuiz(unitWords, allWords, langName);
+              const q = buildUnitQuiz(unitWords, allWords);
               setUnitQuiz(q);
               setUnitQuizScore(0);
               setScreen('unit-quiz');
@@ -1072,7 +1075,7 @@ export default function ConversationScreen() {
             {isLastInUnit && unitWords.length >= 4 ? 'Unit Quiz →' : (pct100 >= 60 ? 'Continue →' : 'Back to path →')}
           </button>
           {topic && ls && (
-            <button className="conv-back-link" onClick={() => handleStartLesson(topic, mode)}>Practice again</button>
+            <button className="conv-back-link" onClick={() => handleStartLesson(topic)}>Practice again</button>
           )}
         </div>
       </div>
@@ -1081,7 +1084,6 @@ export default function ConversationScreen() {
 
   // LESSON
   if (screen === 'lesson' && ls && ex) {
-    const progress = ls.idx / total;
     const canCheck = !ls.checked && (
       (ex.kind === 'mc' && ls.selected !== null) ||
       (ex.kind === 'type' && ls.typed.trim().length > 0) ||
@@ -1307,7 +1309,6 @@ export default function ConversationScreen() {
           isLoading={chatLoading}
           unread={chatUnread}
           onSend={handleChatSend}
-          ttsLang={ttsLang}
           currentWord={ex && ex.kind !== 'pairs' && ex.kind !== 'flash' ? { target: (ex as MCExercise | TypeExercise).word.target, english: (ex as MCExercise | TypeExercise).word.english } : undefined}
           langName={langName}
         />

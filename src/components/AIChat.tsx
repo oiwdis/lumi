@@ -13,14 +13,13 @@ interface Props {
   isLoading: boolean;
   unread: boolean;
   onSend: (text: string, isPronunciation?: boolean) => void;
-  ttsLang: string;
   currentWord?: { target: string; english: string; hint?: string };
   langName: string;
 }
 
 export default function AIChat({
   isOpen, onToggle, messages, isLoading, unread,
-  onSend, ttsLang, currentWord, langName,
+  onSend, currentWord, langName,
 }: Props) {
   const [input, setInput] = useState('');
   const [listening, setListening] = useState(false);

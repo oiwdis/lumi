@@ -61,7 +61,8 @@ export default function LoginScreen({ onAuth, initialTab = 'login', onBack }: Pr
   };
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') view === 'forgot' ? sendReset() : submit();
+    if (e.key !== 'Enter') return;
+    if (view === 'forgot') sendReset(); else submit();
   };
 
   if (view === 'forgot' || view === 'forgot-sent') {

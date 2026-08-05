@@ -1,4 +1,5 @@
 import type { CourseId } from '../types';
+import { authHeader } from './authHeader';
 
 const LANG_NAMES: Record<CourseId, string> = {
   'en-es': 'Spanish',
@@ -63,7 +64,7 @@ export async function streamTutorMessage(
   try {
     const resp = await fetch('/api/tutor', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
       body: JSON.stringify({ messages, systemPrompt: buildSystemPrompt(ctx) }),
     });
 

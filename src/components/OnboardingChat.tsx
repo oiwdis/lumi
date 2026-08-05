@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { COURSES, LANG_NAME } from '../data';
 import { GOAL_EXAMPLE, GOAL_HINT } from '../data/landingLangs';
+import { authHeader } from '../lib/authHeader';
 
 // ── Mini-game word bank ───────────────────────────────────────────────────────
 const WORD_BANK: { en: string; es: string; fr: string; de: string; it: string; pt: string; zh: string; zhR: string; ja: string; jaR: string; ko: string; koR: string }[] = [
@@ -189,7 +190,7 @@ export default function OnboardingChat() {
     try {
       const res = await fetch('/api/customize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({ courseId: selectedCourse, language: lang, goal: input.trim(), level: chosenLevel }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to generate lessons');

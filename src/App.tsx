@@ -46,6 +46,7 @@ export default function App() {
   const toggleTheme = useAppStore(s => s.toggleTheme);
   const syncFromServer = useAppStore(s => s.syncFromServer);
   const user = useAppStore(s => s.user);
+  const currentLessonId = useAppStore(s => s.currentLessonId);
   const openOnboarding = useAppStore(s => s.openOnboarding);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
@@ -85,22 +86,34 @@ export default function App() {
   }, []);
 
   // On mount: if URL has a known path, set the store screen to match
+  // Screens nobody should land on without an account. Reaching one of these from
+  // the URL (a deep link, or Back after logging out) falls back to the landing page.
+  const PROTECTED: Screen[] = ['select', 'onboarding', 'path', 'chat', 'profile'];
+
+  // Follow the URL into the store. This runs on mount for deep links, and again on
+  // every Back/Forward, which is what makes the browser's back button walk through
+  // the app instead of leaving it.
   useEffect(() => {
     const mapped = PATH_TO_SCREEN[location.pathname];
-    if (mapped && mapped !== screen) {
-      // Only navigate to public screens from URL directly — protected ones need auth
-      if (mapped === 'home' || mapped === 'login') setScreen(mapped);
-    }
+    if (!mapped || mapped === screen) return;
+    if (PROTECTED.includes(mapped) && !user) { setScreen('home'); return; }
+    // /lesson is meaningless without a chosen lesson — send them back to the path
+    if (mapped === 'chat' && !currentLessonId) { setScreen('path'); return; }
+    setScreen(mapped);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [location.pathname]);
 
   // Whenever screen changes in store, update the URL. A path that already maps to
   // the current screen is left alone, so deep links like /learn-japanese survive
   // instead of being rewritten to '/'.
+  //
+  // This pushes rather than replaces: with replace, the whole app occupied a single
+  // history entry, so pressing Back from any screen left the site entirely instead
+  // of going to the previous screen.
   useEffect(() => {
     const targetPath = SCREEN_TO_PATH[screen];
     if (targetPath && PATH_TO_SCREEN[location.pathname] !== screen) {
-      navigate(targetPath, { replace: true });
+      navigate(targetPath);
     }
   }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps
 

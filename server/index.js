@@ -51,6 +51,22 @@ function hash(password) {
   return crypto.createHash('sha256').update(password + 'linguo-salt').digest('hex');
 }
 
+// Email is the account key, so it has to be compared case-insensitively.
+// Without this, signing up as Sam@x.com and later typing sam@x.com created a
+// second, empty account and the first one's progress looked lost.
+function normEmail(email) {
+  return String(email ?? '').trim().toLowerCase();
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const MIN_PASSWORD = 8;
+
+/** Find a key in the JSON-file store regardless of the case it was saved in. */
+function findUserKey(users, email) {
+  const target = normEmail(email);
+  return Object.keys(users).find(k => normEmail(k) === target);
+}
+
 // File-based fallbacks (local dev only)
 function loadUsers() {
   if (!existsSync(USERS_FILE)) return {};
@@ -101,8 +117,13 @@ if (existsSync(distPath)) {
 
 // Signup
 app.post('/api/auth/signup', async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, password } = req.body;
+  const email = normEmail(req.body.email);
   if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' });
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
+  if (String(password).length < MIN_PASSWORD) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters` });
+  }
 
   const ph = hash(password);
   const id = crypto.randomUUID();
@@ -110,6 +131,9 @@ app.post('/api/auth/signup', async (req, res) => {
 
   if (pool) {
     try {
+      // Catches legacy rows stored with different capitalisation
+      const { rows: existing } = await pool.query('SELECT 1 FROM users WHERE LOWER(email) = $1', [email]);
+      if (existing[0]) return res.status(409).json({ error: 'Email already registered' });
       await pool.query(
         'INSERT INTO users (id, name, email, password_hash, created_at) VALUES ($1,$2,$3,$4,$5)',
         [id, name, email, ph, createdAt]
@@ -120,7 +144,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
   } else {
     const users = loadUsers();
-    if (users[email]) return res.status(409).json({ error: 'Email already registered' });
+    if (findUserKey(users, email)) return res.status(409).json({ error: 'Email already registered' });
     users[email] = { id, name, email, passwordHash: ph, createdAt };
     saveUsers(users);
   }
@@ -131,30 +155,33 @@ app.post('/api/auth/signup', async (req, res) => {
 
 // Login
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { password } = req.body;
+  const email = normEmail(req.body.email);
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
   const ph = hash(password);
 
   if (pool) {
-    const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [email]);
     const user = rows[0];
     if (!user || user.password_hash !== ph) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
-    const token = Buffer.from(`${email}:${ph}`).toString('base64');
+    // Build the token from the stored spelling, not what was typed
+    const token = Buffer.from(`${user.email}:${ph}`).toString('base64');
     return res.json({
       user: { id: user.id, name: user.name, email: user.email, createdAt: user.created_at },
       token,
     });
   } else {
     const users = loadUsers();
-    const user = users[email];
+    const key = findUserKey(users, email);
+    const user = key ? users[key] : null;
     if (!user || user.passwordHash !== ph) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     const { passwordHash: _, ...safe } = user;
-    const token = Buffer.from(`${email}:${ph}`).toString('base64');
+    const token = Buffer.from(`${user.email}:${ph}`).toString('base64');
     return res.json({ user: safe, token });
   }
 });
@@ -162,7 +189,8 @@ app.post('/api/auth/login', async (req, res) => {
 // Admin — list all users (only accessible by elliot@themaclan.com)
 app.get('/api/admin/users', async (req, res) => {
   const auth = await getAuthUser(req);
-  if (!auth || auth.email !== 'elliot@themaclan.com') return res.status(403).json({ error: 'Forbidden' });
+  const ADMIN_EMAIL = normEmail(process.env.ADMIN_EMAIL ?? 'elliot@themaclan.com');
+  if (!auth || normEmail(auth.email) !== ADMIN_EMAIL) return res.status(403).json({ error: 'Forbidden' });
 
   if (pool) {
     const { rows } = await pool.query(
@@ -226,24 +254,25 @@ app.post('/api/progress', async (req, res) => {
 
 // Forgot password — generate token and send email via Resend
 app.post('/api/auth/forgot-password', async (req, res) => {
-  const { email } = req.body;
+  const email = normEmail(req.body.email);
   if (!email) return res.status(400).json({ error: 'Email required' });
 
   const token = crypto.randomBytes(32).toString('hex');
   const expires = Date.now() + 1000 * 60 * 60; // 1 hour
 
   if (pool) {
-    const { rows } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const { rows } = await pool.query('SELECT email FROM users WHERE LOWER(email) = $1', [email]);
     if (!rows[0]) return res.json({ ok: true }); // Don't reveal if email exists
     await pool.query(
       'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3',
-      [token, expires, email]
+      [token, expires, rows[0].email]
     );
   } else {
     const users = loadUsers();
-    if (!users[email]) return res.json({ ok: true });
-    users[email].resetToken = token;
-    users[email].resetTokenExpires = expires;
+    const key = findUserKey(users, email);
+    if (!key) return res.json({ ok: true });
+    users[key].resetToken = token;
+    users[key].resetTokenExpires = expires;
     saveUsers(users);
   }
 
@@ -271,6 +300,9 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 app.post('/api/auth/reset-password', async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'Token and password required' });
+  if (String(password).length < MIN_PASSWORD) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters` });
+  }
 
   const newHash = hash(password);
 
@@ -297,9 +329,40 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
+// ── Abuse control for the paid endpoints ─────────────────────────────────────
+// /api/tutor and /api/customize call Anthropic, so an open endpoint is a bill
+// anyone on the internet can run up. Both now require a signed-in user, and the
+// expensive one is capped per account.
+
+/** Sliding-window counter. Returns true when the caller is over the limit. */
+function overLimit(store, key, limit, windowMs) {
+  const now = Date.now();
+  const recent = (store.get(key) ?? []).filter(t => now - t < windowMs);
+  if (recent.length >= limit) return true;
+  recent.push(now);
+  store.set(key, recent);
+  if (store.size > 5000) {
+    for (const [k, v] of store) if (!v.some(t => now - t < windowMs)) store.delete(k);
+  }
+  return false;
+}
+
+const tutorHits = new Map();      // email -> timestamps
+const customizeHits = new Map();  // email -> timestamps
+
 // AI Tutor (streaming)
 app.post('/api/tutor', async (req, res) => {
   const { messages, systemPrompt } = req.body;
+
+  const auth = await getAuthUser(req);
+  if (!auth) return res.status(401).json({ error: 'Please sign in to use the tutor.' });
+  if (overLimit(tutorHits, auth.email, 120, 3600_000)) {
+    return res.status(429).json({ error: 'You have sent a lot of messages this hour — try again shortly.' });
+  }
+
+  if (!Array.isArray(messages) || !messages.length) {
+    return res.status(400).json({ error: 'messages required' });
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(503).json({ error: 'AI tutor not configured' });
@@ -338,6 +401,16 @@ app.post('/api/tutor', async (req, res) => {
 app.post('/api/customize', async (req, res) => {
   const { courseId, language, goal, level = 'beginner' } = req.body;
   if (!goal || !language) return res.status(400).json({ error: 'goal and language required' });
+  if (typeof goal !== 'string' || goal.length > 600) {
+    return res.status(400).json({ error: 'Keep your goal under 600 characters.' });
+  }
+
+  // A full curriculum is the most expensive call in the app — signed in only
+  const auth = await getAuthUser(req);
+  if (!auth) return res.status(401).json({ error: 'Please sign in to build a plan.' });
+  if (overLimit(customizeHits, auth.email, 12, 3600_000)) {
+    return res.status(429).json({ error: 'You have generated a lot of plans this hour — try again shortly.' });
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'AI not configured' });
 
