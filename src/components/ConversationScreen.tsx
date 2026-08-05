@@ -226,7 +226,6 @@ function similarity(a: string, b: string): number {
 interface LessonState {
   exercises: Exercise[];
   idx: number;
-  hearts: number;
   score: number;
   // per-exercise interaction state
   selected: number | null;       // MC selected index
@@ -246,7 +245,7 @@ interface LessonState {
 function initLesson(topic: Topic, pool: Word[], langName: string): LessonState {
   const exercises = buildExercises(topic, pool, langName);
   return {
-    exercises, idx: 0, hearts: 3, score: 0,
+    exercises, idx: 0, score: 0,
     selected: null, typed: '', checked: false, correct: null,
     pairsLeft: [], pairsRight: [], pairsSelected: null, pairsMatched: [], pairsWrong: null,
     flashIdx: 0,
@@ -464,9 +463,8 @@ export default function ConversationScreen() {
       correct = checkType(ls.typed, ex);
     }
 
-    const newHearts = correct ? ls.hearts : Math.max(0, ls.hearts - 1);
     const newScore = correct ? ls.score + 1 : ls.score;
-    setLs(prev => prev ? { ...prev, checked: true, correct, hearts: newHearts, score: newScore } : prev);
+    setLs(prev => prev ? { ...prev, checked: true, correct, score: newScore } : prev);
     const xpAmt = correct ? 20 : 5;
     addXp(xpAmt);
 
@@ -493,7 +491,7 @@ export default function ConversationScreen() {
   // ── continue to next ─────────────────────────────────────────────────────────
   const handleContinue = useCallback(() => {
     if (!ls) return;
-    if (isLastExercise || ls.hearts === 0) {
+    if (isLastExercise) {
       if (topic) {
         const q = buildQuiz(topic, allWords, langName);
         setQuiz(q);
@@ -547,7 +545,7 @@ export default function ConversationScreen() {
         correct: allDone ? true : null,
       } : prev);
     } else {
-      setLs(prev => prev ? { ...prev, pairsSelected: null, pairsWrong: leftVal, hearts: Math.max(0, (prev.hearts - 1)) } : prev);
+      setLs(prev => prev ? { ...prev, pairsSelected: null, pairsWrong: leftVal } : prev);
       setTimeout(() => setLs(prev => prev ? { ...prev, pairsWrong: null } : prev), 600);
     }
   }, [ls, ex, addXp]);
@@ -1041,7 +1039,6 @@ export default function ConversationScreen() {
   if (screen === 'results') {
     const totalEx = ls ? ls.exercises.filter(e => e.kind !== 'pairs').length : 1;
     const score = ls ? ls.score : 0;
-    const hearts = ls ? ls.hearts : 0;
     const pct100 = Math.round((score / totalEx) * 100);
     return (
       <div className="conv-screen">
@@ -1052,7 +1049,6 @@ export default function ConversationScreen() {
           <div className="dl-results-stats">
             <div className="dl-stat"><span className="dl-stat-num">{score}/{totalEx}</span><span className="dl-stat-lbl">Lesson</span></div>
             <div className="dl-stat"><span className="dl-stat-num">{quizScore}/5</span><span className="dl-stat-lbl">🎯 Quiz</span></div>
-            <div className="dl-stat"><span className="dl-stat-num">{hearts}⚡</span><span className="dl-stat-lbl">Energy</span></div>
           </div>
           {topic && (
             <div className="dl-words-review">
@@ -1106,11 +1102,6 @@ export default function ConversationScreen() {
             ))}
           </div>
           <span className="dl-progress-count">{ls.idx + 1}/{total}</span>
-          <div className="dl-hearts">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <span key={i} className={i < ls.hearts ? 'heart-full' : 'heart-empty'}>⚡</span>
-            ))}
-          </div>
         </div>
 
         {/* Exercise card */}
@@ -1300,7 +1291,7 @@ export default function ConversationScreen() {
         <div className="dl-footer">
           {ex.kind === 'flash' ? null : ls.checked ? (
             <button className="dl-continue-btn" onClick={handleContinue}>
-              {isLastExercise || ls.hearts === 0 ? 'See results →' : 'Continue →'}
+              {isLastExercise ? 'See results →' : 'Continue →'}
             </button>
           ) : (
             <button className="dl-check-btn" onClick={ex.kind === 'pairs' ? undefined : handleCheck}

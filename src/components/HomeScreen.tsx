@@ -1,60 +1,58 @@
-import { Target, Bot, Zap, Layers, Trophy, Smartphone } from 'lucide-react';
+import { useEffect } from 'react';
+import { Target, Bot, MessagesSquare } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { LANDING_LANGS, type LandingLang } from '../data/landingLangs';
+import ProductDemo from './ProductDemo';
+import GoalDemo from './GoalDemo';
 
-interface Props { onGetStarted: () => void; }
+interface Props {
+  onGetStarted: () => void;
+  /** Set when the visitor landed on a per-language route like /learn-japanese. */
+  lang?: LandingLang;
+  onPickLang: (slug: string | null) => void;
+}
 
+// Three claims a generic app cannot make. Streaks, XP, flashcards and device
+// sync were cut on purpose: every competitor has them, so listing them invited
+// a comparison on their terms rather than ours.
 const FEATURES = [
   {
     icon: Target,
     title: 'Built around your goal',
-    desc: 'Tell Lumi why you\'re learning — moving abroad, dating someone, travel — and it builds a curriculum just for you.',
+    desc: 'Say you\'re moving to Madrid in March and you get lessons about apartments, banks and small talk — not colours and farm animals.',
   },
   {
     icon: Bot,
-    title: 'AI tutor in every lesson',
-    desc: 'Stuck on a word? Ask Lumi mid-lesson. Get instant explanations, examples, and corrections in real time.',
+    title: 'A tutor that explains why',
+    desc: 'Ask mid-lesson and Lumi answers in the exercise: why this ending, why not that word. Not a red cross and a guess.',
   },
   {
-    icon: Zap,
-    title: 'Adapts to your level',
-    desc: 'Lessons match your level — beginner to advanced — and get harder as you improve.',
-  },
-  {
-    icon: Layers,
-    title: 'Four ways to learn',
-    desc: 'Flashcards, multiple choice, typing, and word-pair matching — every lesson covers all the ways your brain actually retains things.',
-  },
-  {
-    icon: Trophy,
-    title: 'Streaks & rewards',
-    desc: 'Daily streaks and XP levels keep you coming back. Language learning is a marathon — Lumi makes it a game.',
-  },
-  {
-    icon: Smartphone,
-    title: 'Learn anywhere',
-    desc: 'Progress syncs across every device. Pick up on your phone where you left off on your laptop.',
+    icon: MessagesSquare,
+    title: 'Real phrases, not word lists',
+    desc: 'Every lesson teaches whole sentences you would actually say, so your first real conversation isn\'t your first attempt.',
   },
 ];
 
-const LANGUAGES = [
-  { flag: '🇪🇸', name: 'Spanish' },
-  { flag: '🇫🇷', name: 'French' },
-  { flag: '🇨🇳', name: 'Chinese' },
-  { flag: '🇯🇵', name: 'Japanese' },
-  { flag: '🇰🇷', name: 'Korean' },
-  { flag: '🇩🇪', name: 'German' },
-];
-
-export default function HomeScreen({ onGetStarted }: Props) {
+export default function HomeScreen({ onGetStarted, lang, onPickLang }: Props) {
   const { theme, toggleTheme } = useAppStore();
+  const langName = lang?.name;
+
+  // The server injects these for crawlers; this keeps the tab and share cards
+  // right when the visitor arrives via client-side navigation instead.
+  useEffect(() => {
+    document.title = langName
+      ? `Learn ${langName} with an AI tutor built around your goal · Lumi`
+      : 'Lumi — AI Language Tutor';
+  }, [langName]);
+
   return (
     <div className="home-screen">
       {/* Nav */}
       <nav className="home-nav">
-        <div className="home-nav-brand">
+        <button className="home-nav-brand" onClick={() => onPickLang(null)}>
           <span>🌱</span>
           <span className="home-nav-name">Lumi</span>
-        </div>
+        </button>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '☀️' : '🌙'}</button>
           <button className="home-nav-login" onClick={onGetStarted}>Log in</button>
@@ -64,27 +62,40 @@ export default function HomeScreen({ onGetStarted }: Props) {
       {/* Hero */}
       <section className="home-hero">
         <h1 className="home-hero-title">
-          Learn a language<br />
+          {langName ? `Learn ${langName}` : 'Learn a language'}<br />
           <span className="home-hero-accent">built for you</span>
         </h1>
         <p className="home-hero-sub">
-          Tell Lumi your goal. Get a personalized curriculum in 15 seconds.<br />
+          Tell Lumi your goal. Get a personalized {langName ?? ''} curriculum in 15 seconds.<br />
           Practice with an AI tutor that actually explains things.
         </p>
-        <button className="home-cta-btn" onClick={onGetStarted}>
-          Start for free →
-        </button>
+        <a className="home-cta-btn" href="#try">
+          Build my first lesson →
+        </a>
         <div className="home-lang-pills">
-          {LANGUAGES.map(l => (
-            <span key={l.name} className="home-lang-pill">{l.flag} {l.name}</span>
+          {LANDING_LANGS.map(l => (
+            <button
+              key={l.slug}
+              className={`home-lang-pill${l.slug === lang?.slug ? ' home-lang-pill--active' : ''}`}
+              onClick={() => onPickLang(l.slug === lang?.slug ? null : l.slug)}
+              aria-pressed={l.slug === lang?.slug}
+            >
+              {l.flag} {l.name}
+            </button>
           ))}
         </div>
       </section>
 
+      {/* Product visual — fills the gap between the hero and the features */}
+      <ProductDemo />
+
+      {/* Try-before-signup generator */}
+      <GoalDemo defaultCourse={lang?.courseId ?? 'en-es'} onGetStarted={onGetStarted} />
+
       {/* Features */}
       <section className="home-features">
-        <h2 className="home-section-title">Everything generic apps miss</h2>
-        <div className="home-feature-grid">
+        <h2 className="home-section-title">Three things generic apps can't do</h2>
+        <div className="home-feature-grid home-feature-grid--three">
           {FEATURES.map(f => (
             <div key={f.title} className="home-feature-card">
               <f.icon className="home-feature-icon" size={26} strokeWidth={2} />
@@ -103,7 +114,7 @@ export default function HomeScreen({ onGetStarted }: Props) {
       </section>
 
       <footer className="home-footer">
-        <span>© 2025 Lumi · AI language learning</span>
+        <span>© {new Date().getFullYear()} Lumi · AI language learning</span>
         <a
           className="home-footer-badge"
           href="https://fazier.com/launches/lumilanguage.com"

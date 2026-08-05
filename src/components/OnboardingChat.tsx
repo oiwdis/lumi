@@ -162,7 +162,19 @@ export default function OnboardingChat() {
   const course = COURSES.find(c => c.id === selectedCourse);
   const lang = selectedCourse ? (LANG_GREETING[selectedCourse] ?? 'this language') : 'this language';
 
-  const [input, setInput] = useState('');
+  // Pick up a goal typed on the landing page before signup, and consume it so a
+  // later visit to onboarding starts blank.
+  const [input, setInput] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('lumi-pending-goal');
+      if (!raw) return '';
+      sessionStorage.removeItem('lumi-pending-goal');
+      const pending = JSON.parse(raw);
+      return typeof pending?.goal === 'string' ? pending.goal : '';
+    } catch {
+      return '';
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);

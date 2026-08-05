@@ -419,10 +419,148 @@ Rules:
   }
 });
 
+// ── Landing-page plan preview ────────────────────────────────────────────────
+// Anonymous visitors get a taste of the curriculum generator before signing up.
+// This endpoint spends real API credits for anyone who finds the URL, so it is
+// deliberately much cheaper than /api/customize (one unit, not five) and capped
+// per IP and per day.
+
+const PREVIEW_PER_IP_PER_HOUR = 3;
+const PREVIEW_PER_DAY = 300;
+const previewHits = new Map();   // ip -> number[] of timestamps
+let previewDay = { day: '', count: 0 };
+
+function previewRateLimit(ip) {
+  const now = Date.now();
+  const today = new Date(now).toISOString().slice(0, 10);
+  if (previewDay.day !== today) previewDay = { day: today, count: 0 };
+  if (previewDay.count >= PREVIEW_PER_DAY) {
+    return 'Lumi has hit its daily limit for free previews. Create an account to build your full plan.';
+  }
+  const recent = (previewHits.get(ip) ?? []).filter(t => now - t < 3600_000);
+  if (recent.length >= PREVIEW_PER_IP_PER_HOUR) {
+    return 'You have used your free previews for this hour. Create an account to build your full plan.';
+  }
+  recent.push(now);
+  previewHits.set(ip, recent);
+  previewDay.count++;
+  // Keep the map from growing without bound on a long-running process
+  if (previewHits.size > 5000) {
+    for (const [k, v] of previewHits) {
+      if (!v.some(t => now - t < 3600_000)) previewHits.delete(k);
+    }
+  }
+  return null;
+}
+
+app.post('/api/preview-plan', async (req, res) => {
+  const { courseId, language, goal } = req.body ?? {};
+  if (!goal || !language) return res.status(400).json({ error: 'goal and language required' });
+  if (typeof goal !== 'string' || goal.length > 300) {
+    return res.status(400).json({ error: 'Keep your goal under 300 characters.' });
+  }
+  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'AI not configured' });
+
+  const ip = (req.headers['x-forwarded-for'] ?? '').toString().split(',')[0].trim() || req.ip || 'unknown';
+  const limited = previewRateLimit(ip);
+  if (limited) return res.status(429).json({ error: limited });
+
+  const isCJK = courseId === 'en-zh' || courseId === 'en-ja' || courseId === 'en-ko';
+  const systemPrompt = `You are a language curriculum designer. Given a learner's goal, design the FIRST unit of a personalized ${language} course. Return ONLY valid JSON, no markdown:
+
+{
+  "title": "unit title (2-4 words)",
+  "subtitle": "one short line on what this unit gets them doing",
+  "emoji": "single emoji",
+  "lessons": [
+    { "title": "Lesson Title", "emoji": "single emoji", "words": [ { "english": "phrase in English", "target": "phrase in ${language}"${isCJK ? ', "reading": "pronunciation"' : ''} } ] }
+  ]
+}
+
+Rules:
+- Exactly 3 lessons, each with exactly 3 word/phrase pairs
+- Tailor everything tightly to the stated goal — no generic vocabulary
+- Prefer whole phrases the learner will actually say over single words
+- Assume a beginner
+- All target language text must be accurate ${language}`;
+
+  try {
+    const response = await client.messages.stream({
+      model: 'claude-opus-4-8',
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: `Learner's goal: ${goal}` }],
+    }).finalMessage();
+
+    const text = response.content.find(b => b.type === 'text')?.text ?? '';
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start === -1 || end === -1) return res.status(500).json({ error: 'Could not build a preview. Try rephrasing your goal.' });
+    let unit;
+    try {
+      unit = JSON.parse(text.slice(start, end + 1));
+    } catch {
+      return res.status(500).json({ error: 'Could not build a preview. Try again.' });
+    }
+    if (!unit.lessons?.length) return res.status(500).json({ error: 'Could not build a preview. Try again.' });
+    res.json(unit);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Per-language landing pages ───────────────────────────────────────────────
+// The app is a client-rendered SPA, so a crawler that fetches /learn-japanese
+// would otherwise receive the same generic <title> as every other route. Inject
+// the real title and description server-side so these pages are indexable.
+
+const LANDING_LANGS = {
+  'learn-spanish':  { name: 'Spanish',  speakers: '500M+' },
+  'learn-french':   { name: 'French',   speakers: '300M+' },
+  'learn-chinese':  { name: 'Chinese',  speakers: '1B+'   },
+  'learn-japanese': { name: 'Japanese', speakers: '125M+' },
+  'learn-korean':   { name: 'Korean',   speakers: '80M+'  },
+  'learn-german':   { name: 'German',   speakers: '100M+' },
+};
+
+const SITE_ORIGIN = process.env.SITE_ORIGIN ?? 'https://lumilanguage.com';
+
+app.get('/sitemap.xml', (_req, res) => {
+  const urls = ['/', ...Object.keys(LANDING_LANGS).map(s => `/${s}`)];
+  res.type('application/xml').send(
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    urls.map(u => `  <url><loc>${SITE_ORIGIN}${u}</loc></url>`).join('\n') +
+    `\n</urlset>\n`,
+  );
+});
+
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain').send(`User-agent: *\nAllow: /\nSitemap: ${SITE_ORIGIN}/sitemap.xml\n`);
+});
+
 // Fall through to index.html for any non-API route (SPA)
 // app.use (no path) works as a catch-all in Express 4 and 5
 if (existsSync(distPath)) {
-  app.use((_req, res) => res.sendFile(join(distPath, 'index.html')));
+  const indexHtml = readFileSync(join(distPath, 'index.html'), 'utf8');
+
+  const escapeHtml = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  app.use((req, res) => {
+    const slug = req.path.replace(/^\/|\/$/g, '');
+    const lang = LANDING_LANGS[slug];
+    if (!lang) return res.sendFile(join(distPath, 'index.html'));
+
+    const title = `Learn ${lang.name} with an AI tutor built around your goal · Lumi`;
+    const desc = `Tell Lumi why you're learning ${lang.name} and get a curriculum built for that goal, with an AI tutor that explains the grammar mid-lesson. Free to start.`;
+    const html = indexHtml.replace(
+      /<title>.*?<\/title>/,
+      `<title>${escapeHtml(title)}</title>\n    <meta name="description" content="${escapeHtml(desc)}" />` +
+      `\n    <link rel="canonical" href="${SITE_ORIGIN}/${slug}" />` +
+      `\n    <meta property="og:title" content="${escapeHtml(title)}" />` +
+      `\n    <meta property="og:description" content="${escapeHtml(desc)}" />`,
+    );
+    res.type('html').send(html);
+  });
 }
 
 const PORT = process.env.PORT || 3001;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from './store/useAppStore';
+import type { CourseId } from './types';
 import HomeScreen from './components/HomeScreen';
 import LoginScreen from './components/LoginScreen';
 import ResetPasswordScreen from './components/ResetPasswordScreen';
@@ -9,6 +10,7 @@ import LessonPath from './components/LessonPath';
 import ConversationScreen from './components/ConversationScreen';
 import ProfileScreen from './components/ProfileScreen';
 import OnboardingChat from './components/OnboardingChat';
+import { LANDING_LANGS, langBySlug } from './data/landingLangs';
 import './App.css';
 
 type Screen = 'home' | 'login' | 'select' | 'onboarding' | 'path' | 'chat' | 'profile';
@@ -32,6 +34,8 @@ const PATH_TO_SCREEN: Record<string, Screen> = {
   '/path':       'path',
   '/lesson':     'chat',
   '/profile':    'profile',
+  // Per-language landing pages are the home screen with a language-specific hero
+  ...Object.fromEntries(LANDING_LANGS.map(l => [`/${l.slug}`, 'home' as Screen])),
 };
 
 export default function App() {
@@ -41,6 +45,8 @@ export default function App() {
   const theme  = useAppStore(s => s.theme);
   const toggleTheme = useAppStore(s => s.toggleTheme);
   const syncFromServer = useAppStore(s => s.syncFromServer);
+  const user = useAppStore(s => s.user);
+  const openOnboarding = useAppStore(s => s.openOnboarding);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
   // Screens that have their own theme toggle built into their UI
@@ -88,13 +94,23 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Whenever screen changes in store, update the URL
+  // Whenever screen changes in store, update the URL. A path that already maps to
+  // the current screen is left alone, so deep links like /learn-japanese survive
+  // instead of being rewritten to '/'.
   useEffect(() => {
     const targetPath = SCREEN_TO_PATH[screen];
-    if (targetPath && location.pathname !== targetPath) {
+    if (targetPath && PATH_TO_SCREEN[location.pathname] !== screen) {
       navigate(targetPath, { replace: true });
     }
   }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Someone who generated a plan on the landing page shouldn't retype their goal
+  useEffect(() => {
+    if (!user || screen !== 'select') return;
+    let pending: { courseId?: CourseId } | null = null;
+    try { pending = JSON.parse(sessionStorage.getItem('lumi-pending-goal') ?? 'null'); } catch { /* ignore */ }
+    if (pending?.courseId) openOnboarding(pending.courseId);
+  }, [user, screen, openOnboarding]);
 
   if (resetToken) {
     return (
@@ -135,7 +151,13 @@ export default function App() {
           {theme === 'dark' ? '☀️' : '🌙'}
         </button>
       )}
-      {screen === 'home'       && <HomeScreen onGetStarted={() => setScreen('login')} />}
+      {screen === 'home'       && (
+        <HomeScreen
+          onGetStarted={() => setScreen('login')}
+          lang={langBySlug(location.pathname.replace(/^\//, ''))}
+          onPickLang={slug => navigate(slug ? `/${slug}` : '/')}
+        />
+      )}
       {screen === 'login'      && <LoginScreen onAuth={(user, token) => login(user, token)} initialTab={initialTab as 'login' | 'signup'} onBack={() => setScreen('home')} />}
       {screen === 'select'     && <LanguageSelect />}
       {screen === 'onboarding' && <OnboardingChat />}
