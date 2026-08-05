@@ -403,7 +403,7 @@ export default function ConversationScreen() {
   const allWords = topics.flatMap(t => t.words);
 
   // Sort words by SRS priority: overdue words first, then new words, then recently seen
-  const sortBySrs = (words: Word[]): Word[] => {
+  const sortBySrs = useCallback((words: Word[]): Word[] => {
     const now = Date.now();
     return [...words].sort((a, b) => {
       const ka = `${selectedCourse}:${a.target}`;
@@ -415,7 +415,7 @@ export default function ConversationScreen() {
       const dueB = sb ? sb.nextDue : 0;
       return (dueA - now) - (dueB - now); // most overdue first
     });
-  };
+  }, [selectedCourse, wordStats]);
 
   // Look up pinyin/romaji for a target string (used to annotate MC options and pairs)
   const getReading = (target: string): string | undefined => {
