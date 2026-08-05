@@ -2166,6 +2166,13 @@ a.home-cta-btn { display: inline-block; text-decoration: none; }
   margin-bottom: 8px;
 }
 
+.gd-hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: -2px 0 10px;
+}
+
 .gd-textarea {
   width: 100%;
   box-sizing: border-box;
@@ -2179,7 +2186,10 @@ a.home-cta-btn { display: inline-block; text-decoration: none; }
   padding: 13px 14px;
   resize: vertical;
   transition: border-color .15s;
+  /* Room for the full example goal without clipping it mid-sentence */
+  min-height: 112px;
 }
+@media (max-width: 420px) { .gd-textarea { min-height: 140px; } }
 .gd-textarea:focus { outline: none; border-color: var(--accent); }
 .gd-textarea:disabled { opacity: .6; }
 
@@ -4614,7 +4624,11 @@ a.home-cta-btn { display: inline-block; text-decoration: none; }
   border-radius: 14px; color: var(--text); font-size: 15px;
   padding: 14px 16px; resize: none; font-family: inherit; line-height: 1.5;
   transition: border-color .2s;
+  /* The example goal is deliberately long and specific — give it room so it is
+     never clipped mid-sentence on a narrow screen */
+  min-height: 124px;
 }
+@media (max-width: 420px) { .onboard-textarea { min-height: 150px; } }
 .onboard-textarea:focus { outline: none; border-color: var(--lumi); }
 .onboard-textarea::placeholder { color: var(--muted); }
 .onboard-textarea:disabled { opacity: .5; }
@@ -4676,6 +4690,7 @@ a.home-cta-btn { display: inline-block; text-decoration: none; }
 .onboard-level-btn--selected { border-color: var(--lumi); background: rgba(129,140,248,.08); }
 .onboard-level-btn--disabled, .onboard-level-btn:disabled { opacity: .38; cursor: not-allowed; transform: none; }
 .onboard-field-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: block; }
+.onboard-field-hint { font-size: 13px; line-height: 1.5; color: var(--muted); margin: -2px 0 10px; }
 .onboard-level-emoji { font-size: 26px; flex-shrink: 0; }
 .onboard-level-label { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; }
 .onboard-level-desc { font-size: 12px; color: var(--muted); white-space: nowrap; }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CourseId } from '../types';
-import { LANDING_LANGS, GOAL_EXAMPLE } from '../data/landingLangs';
+import { LANDING_LANGS, GOAL_EXAMPLE, GOAL_HINT } from '../data/landingLangs';
 
 /**
  * The curriculum generator, on the landing page, before signup. A visitor types
@@ -110,11 +110,14 @@ export default function GoalDemo({ defaultCourse, onGetStarted }: Props) {
           ))}
         </div>
 
-        <label className="gd-label" htmlFor="gd-goal">Why are you learning {lang.name}?</label>
+        <label className="gd-label" htmlFor="gd-goal">
+          What do you need {lang.name} for? Be specific.
+        </label>
+        <p className="gd-hint">{GOAL_HINT}</p>
         <textarea
           id="gd-goal"
           className="gd-textarea"
-          rows={2}
+          rows={3}
           maxLength={300}
           placeholder={`e.g. “${GOAL_EXAMPLE[courseId]}”`}
           value={goal}

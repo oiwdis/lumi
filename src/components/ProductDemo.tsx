@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import type { CourseId } from '../types';
+import { DEMO_SCRIPT } from '../data/landingLangs';
 
 /**
  * Auto-looping recreation of a real lesson: the learner picks an answer, asks
@@ -6,15 +8,10 @@ import { useEffect, useState } from 'react';
  *
  * Built from the app's own styling rather than a screen recording, so it stays
  * sharp at any width, follows the light/dark theme, and costs no page weight.
+ *
+ * The script follows the language being advertised — remount via a `key` when
+ * the course changes so the animation restarts cleanly.
  */
-
-const OPTIONS = ['Good morning', 'Good afternoon', 'Good night', 'Goodbye'];
-const CORRECT = 1;
-
-const QUESTION = 'why buenas and not buenos?';
-const ANSWER =
-  '“Tardes” is feminine and plural, so “buenas” has to agree with it. ' +
-  'That’s why “buenos días” is correct too — “días” is masculine.';
 
 // step → ms to wait before advancing to the next step
 const TIMELINE = [
@@ -29,15 +26,22 @@ const TIMELINE = [
   4200, // 8 hold on the finished exchange
 ];
 
-export default function ProductDemo() {
+interface Props {
+  courseId: CourseId;
+  langName: string;
+}
+
+export default function ProductDemo({ courseId, langName }: Props) {
+  const script = DEMO_SCRIPT[courseId];
+
   const reduceMotion =
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   // With reduced motion we skip straight to the finished exchange and stay there
   const [step, setStep] = useState(reduceMotion ? 8 : 0);
-  const [typed, setTyped] = useState(reduceMotion ? QUESTION : '');
-  const [streamed, setStreamed] = useState(reduceMotion ? ANSWER : '');
+  const [typed, setTyped] = useState(reduceMotion ? script.question : '');
+  const [streamed, setStreamed] = useState(reduceMotion ? script.answer : '');
 
   // Drive the timeline
   useEffect(() => {
@@ -53,15 +57,15 @@ export default function ProductDemo() {
   useEffect(() => {
     if (reduceMotion) return;
     if (step < 4) { setTyped(''); return; }
-    if (step > 4) { setTyped(QUESTION); return; }
+    if (step > 4) { setTyped(script.question); return; }
     let i = 0;
     const id = window.setInterval(() => {
       i += 1;
-      setTyped(QUESTION.slice(0, i));
-      if (i >= QUESTION.length) window.clearInterval(id);
+      setTyped(script.question.slice(0, i));
+      if (i >= script.question.length) window.clearInterval(id);
     }, 45);
     return () => window.clearInterval(id);
-  }, [step, reduceMotion]);
+  }, [step, reduceMotion, script.question]);
 
   // Stream Lumi's reply, then release the timeline
   useEffect(() => {
@@ -70,14 +74,14 @@ export default function ProductDemo() {
     let i = 0;
     const id = window.setInterval(() => {
       i += 2;
-      setStreamed(ANSWER.slice(0, i));
-      if (i >= ANSWER.length) {
+      setStreamed(script.answer.slice(0, i));
+      if (i >= script.answer.length) {
         window.clearInterval(id);
         setStep(8);
       }
     }, 22);
     return () => window.clearInterval(id);
-  }, [step, reduceMotion]);
+  }, [step, reduceMotion, script.answer]);
 
   const answered = step >= 1;
   const confirmed = step >= 2;
@@ -95,9 +99,9 @@ export default function ProductDemo() {
         </p>
       </div>
 
-      <div className="pd-frame" aria-label="Demonstration of asking the Lumi tutor a question during a lesson">
+      <div className="pd-frame" aria-label={`Demonstration of asking the Lumi tutor a ${langName} question during a lesson`}>
         <div className="pd-topbar">
-          <span className="pd-topbar-flags">🇺🇸 → 🇪🇸</span>
+          <span className="pd-topbar-flags">🇺🇸 → {script.flag}</span>
           <span className="pd-topbar-title">👋 Greetings</span>
           <span className="pd-topbar-streak">🔥 4</span>
         </div>
@@ -105,9 +109,9 @@ export default function ProductDemo() {
         <div className="pd-progress"><div className="pd-progress-fill" /></div>
 
         <div className="pd-body">
-          <div className="pd-instruction">What does this Spanish word mean?</div>
+          <div className="pd-instruction">What does this {langName} word mean?</div>
           <div className="pd-prompt-card">
-            <div className="pd-prompt-word">Buenas tardes</div>
+            <div className="pd-prompt-word">{script.word}</div>
             <div className="pd-speak-row">
               <span className="pd-chip">🔊 Listen</span>
               <span className="pd-chip">🎤 Speak</span>
@@ -115,8 +119,8 @@ export default function ProductDemo() {
           </div>
 
           <div className="pd-options">
-            {OPTIONS.map((opt, i) => {
-              const picked = answered && i === CORRECT;
+            {script.options.map((opt, i) => {
+              const picked = answered && i === script.correct;
               return (
                 <div
                   key={opt}
@@ -140,7 +144,7 @@ export default function ProductDemo() {
           </div>
 
           <div className="pd-chat-msgs">
-            {questionSent && <div className="pd-msg pd-msg--user">{QUESTION}</div>}
+            {questionSent && <div className="pd-msg pd-msg--user">{script.question}</div>}
             {thinking && (
               <div className="pd-msg pd-msg--ai pd-msg--thinking">
                 <span /><span /><span />

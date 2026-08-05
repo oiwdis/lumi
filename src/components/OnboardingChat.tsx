@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { COURSES } from '../data';
+import { GOAL_EXAMPLE, GOAL_HINT } from '../data/landingLangs';
 
 const LANG_GREETING: Record<string, string> = {
   'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese', 'en-ko': 'Korean', 'en-de': 'German',
@@ -161,6 +162,8 @@ export default function OnboardingChat() {
   const { selectedCourse, setCustomLessons, skipOnboarding, goBack } = useAppStore();
   const course = COURSES.find(c => c.id === selectedCourse);
   const lang = selectedCourse ? (LANG_GREETING[selectedCourse] ?? 'this language') : 'this language';
+  // Keyed by course, so a Korean learner never gets a "moving to Mexico" example
+  const goalExample = selectedCourse ? GOAL_EXAMPLE[selectedCourse] : undefined;
 
   // Pick up a goal typed on the landing page before signup, and consume it so a
   // later visit to onboarding starts blank.
@@ -232,14 +235,15 @@ export default function OnboardingChat() {
             </div>
 
             <div className="onboard-input-wrap">
-              <label className="onboard-field-label">Why are you learning {lang}?</label>
+              <label className="onboard-field-label">What do you need {lang} for? Be specific.</label>
+              <p className="onboard-field-hint">{GOAL_HINT}</p>
               <textarea
                 ref={inputRef}
                 className="onboard-textarea"
-                placeholder={`e.g. "Moving to Mexico for work", "Dating someone who speaks ${lang}"…`}
+                placeholder={goalExample ? `e.g. “${goalExample}”` : undefined}
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                rows={3}
+                rows={4}
                 disabled={loading}
               />
 

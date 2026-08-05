@@ -15,11 +15,14 @@ interface Props {
 // Three claims a generic app cannot make. Streaks, XP, flashcards and device
 // sync were cut on purpose: every competitor has them, so listing them invited
 // a comparison on their terms rather than ours.
-const FEATURES = [
+//
+// The first example follows the language on screen — a Korean page describing a
+// move to Madrid undercuts the very claim the card is making.
+const features = (shortGoal: string) => [
   {
     icon: Target,
     title: 'Built around your goal',
-    desc: 'Say you\'re moving to Madrid in March and you get lessons about apartments, banks and small talk — not colours and farm animals.',
+    desc: `Say you're ${shortGoal} and you get lessons for exactly that — the phrases you'll need that week, not colours and farm animals.`,
   },
   {
     icon: Bot,
@@ -36,6 +39,10 @@ const FEATURES = [
 export default function HomeScreen({ onGetStarted, lang, onPickLang }: Props) {
   const { theme, toggleTheme } = useAppStore();
   const langName = lang?.name;
+  // Spanish is the default course, so it is also the default example
+  const demoCourse = lang?.courseId ?? 'en-es';
+  const demoLangName = langName ?? 'Spanish';
+  const FEATURES = features(lang?.shortGoal ?? 'moving to Madrid in March');
 
   // The server injects these for crawlers; this keeps the tab and share cards
   // right when the visitor arrives via client-side navigation instead.
@@ -86,11 +93,12 @@ export default function HomeScreen({ onGetStarted, lang, onPickLang }: Props) {
         </div>
       </section>
 
-      {/* Product visual — fills the gap between the hero and the features */}
-      <ProductDemo />
+      {/* Product visual — fills the gap between the hero and the features.
+          Keyed by course so switching language restarts the animation cleanly. */}
+      <ProductDemo key={demoCourse} courseId={demoCourse} langName={demoLangName} />
 
       {/* Try-before-signup generator */}
-      <GoalDemo defaultCourse={lang?.courseId ?? 'en-es'} onGetStarted={onGetStarted} />
+      <GoalDemo defaultCourse={demoCourse} onGetStarted={onGetStarted} />
 
       {/* Features */}
       <section className="home-features">
