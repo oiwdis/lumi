@@ -1,4 +1,4 @@
-export type CourseId = 'en-es' | 'en-zh' | 'en-fr' | 'en-ja' | 'en-ko' | 'en-de';
+export type CourseId = 'en-es' | 'en-zh' | 'en-fr' | 'en-ja' | 'en-ko' | 'en-de' | 'en-it' | 'en-pt';
 
 export interface CourseInfo {
   id: CourseId;

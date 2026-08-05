@@ -11,7 +11,26 @@ export const COURSES: CourseInfo[] = [
   { id: 'en-ja', fromFlag: '🇺🇸', toFlag: '🇯🇵', fromLang: 'English', toLang: 'Japanese', color: '#FF6B9D', tagline: '125M+ speakers' },
   { id: 'en-ko', fromFlag: '🇺🇸', toFlag: '🇰🇷', fromLang: 'English', toLang: 'Korean', color: '#00C4CC', tagline: '80M+ speakers' },
   { id: 'en-de', fromFlag: '🇺🇸', toFlag: '🇩🇪', fromLang: 'English', toLang: 'German', color: '#58CC02', tagline: '100M+ speakers' },
+  { id: 'en-it', fromFlag: '🇺🇸', toFlag: '🇮🇹', fromLang: 'English', toLang: 'Italian', color: '#1CB0F6', tagline: '65M+ speakers' },
+  { id: 'en-pt', fromFlag: '🇺🇸', toFlag: '🇧🇷', fromLang: 'English', toLang: 'Portuguese', color: '#FFD900', tagline: '260M+ speakers' },
 ];
+
+/**
+ * Display name per course. Typed as an exhaustive Record<CourseId, …> on purpose:
+ * this used to be copy-pasted as Record<string, string> into three components,
+ * so adding a language silently produced "Unknown" in the UI instead of a
+ * compile error. Import this rather than redeclaring it.
+ */
+export const LANG_NAME: Record<CourseId, string> = {
+  'en-es': 'Spanish',
+  'en-zh': 'Chinese',
+  'en-fr': 'French',
+  'en-ja': 'Japanese',
+  'en-ko': 'Korean',
+  'en-de': 'German',
+  'en-it': 'Italian',
+  'en-pt': 'Portuguese',
+};
 
 export const ALL_STORIES: Story[] = [
   ...enEsStories,

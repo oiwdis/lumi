@@ -1,18 +1,14 @@
 import { useAppStore } from '../store/useAppStore';
 import { LESSON_UNITS, FLAT_LESSONS, type UnitDef, type LessonDef } from '../data/lessonPath';
 import type { CustomUnit } from '../store/useAppStore';
-import { COURSES } from '../data';
+import { COURSES, LANG_NAME } from '../data';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
 import Avatar from './Avatar';
-
-const LANG_NAME: Record<string, string> = {
-  'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese', 'en-ko': 'Korean', 'en-de': 'German',
-};
 
 export default function LessonPath() {
   const { selectedCourse, completedLessons, xp, streak, customLessons, customGoal, goalSkipped, theme, wordStats, startLesson, goBack, logout, openProfile, openOnboarding, toggleTheme } = useAppStore();
   const course = selectedCourse ? COURSES.find(c => c.id === selectedCourse) : null;
-  const langName = selectedCourse ? (LANG_NAME[selectedCourse] ?? 'Unknown') : '';
+  const langName = selectedCourse ? LANG_NAME[selectedCourse] : '';
   const done = selectedCourse ? (completedLessons[selectedCourse] ?? []) : [];
   const level = getLevelForXp(xp);
   const { pct } = xpProgressInLevel(xp);

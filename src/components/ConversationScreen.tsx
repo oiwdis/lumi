@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { COURSES } from '../data';
+import { COURSES, LANG_NAME } from '../data';
 import { TOPICS, type Topic, type Word } from '../data/lessonWords';
 import { LESSON_UNITS } from '../data/lessonPath';
 import { getLevelForXp, xpProgressInLevel } from '../lib/levels';
@@ -11,9 +11,7 @@ import AIChat, { type ChatMessage } from './AIChat';
 
 const TTS_LANG: Record<string, string> = {
   'en-es': 'es-ES', 'en-zh': 'zh-CN', 'en-fr': 'fr-FR', 'en-ja': 'ja-JP', 'en-ko': 'ko-KR', 'en-de': 'de-DE',
-};
-const LANG_NAME: Record<string, string> = {
-  'en-es': 'Spanish', 'en-zh': 'Chinese', 'en-fr': 'French', 'en-ja': 'Japanese', 'en-ko': 'Korean', 'en-de': 'German',
+  'en-it': 'it-IT', 'en-pt': 'pt-BR',
 };
 
 type Mode = 'voice' | 'silent';

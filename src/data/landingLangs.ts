@@ -22,6 +22,8 @@ export const LANDING_LANGS: LandingLang[] = [
   { slug: 'learn-japanese', courseId: 'en-ja', name: 'Japanese', flag: '🇯🇵', speakers: '125M+', shortGoal: 'spending two weeks in Tokyo' },
   { slug: 'learn-korean',   courseId: 'en-ko', name: 'Korean',   flag: '🇰🇷', speakers: '80M+',  shortGoal: 'visiting your cousin in Seoul' },
   { slug: 'learn-german',   courseId: 'en-de', name: 'German',   flag: '🇩🇪', speakers: '100M+', shortGoal: 'starting a job in Berlin' },
+  { slug: 'learn-italian',  courseId: 'en-it', name: 'Italian',  flag: '🇮🇹', speakers: '65M+',  shortGoal: 'spending two weeks in Rome' },
+  { slug: 'learn-portuguese', courseId: 'en-pt', name: 'Portuguese', flag: '🇧🇷', speakers: '260M+', shortGoal: 'moving to São Paulo in February' },
 ];
 
 /**
@@ -87,6 +89,22 @@ export const DEMO_SCRIPT: Record<CourseId, DemoScript> = {
     question: 'why guten and not gut?',
     answer: 'The greeting is a shortened “Ich wünsche Ihnen einen guten Morgen”, so “Morgen” is the object of the sentence. Masculine accusative takes the -en ending.',
   },
+  'en-it': {
+    flag: '🇮🇹',
+    word: 'Buonasera',
+    options: ['Good morning', 'Good evening', 'Good night', 'Goodbye'],
+    correct: 1,
+    question: 'why buona and not buono?',
+    answer: '“Sera” is feminine, so the adjective becomes “buona”. “Buongiorno” keeps the masculine “buon” because “giorno” is masculine — the ending follows the noun.',
+  },
+  'en-pt': {
+    flag: '🇧🇷',
+    word: 'Bom dia',
+    options: ['Good morning', 'Good afternoon', 'Good night', 'Goodbye'],
+    correct: 0,
+    question: 'why bom dia but boa tarde?',
+    answer: '“Dia” is masculine so it takes “bom”. “Tarde” and “noite” are feminine, so they take “boa” — the adjective always agrees with the noun’s gender.',
+  },
 };
 
 export function langBySlug(slug: string): LandingLang | undefined {
@@ -109,6 +127,8 @@ export const GOAL_EXAMPLE: Record<CourseId, string> = {
   'en-ja': 'Two weeks in Tokyo in April — ordering in restaurants and chatting with my Airbnb host',
   'en-ko': 'Visiting my cousin in Seoul in October — I want to order food and follow shows without subtitles',
   'en-de': 'Just took a job in Berlin — I need to handle the Anmeldung and join lunch chat at work',
+  'en-it': 'Two weeks in Rome in June — ordering in trattorias and talking to my landlady',
+  'en-pt': 'Moving to São Paulo in February for work — I need to open a bank account and chat with colleagues',
 };
 
 /** Shown under the goal field, in both the landing demo and onboarding. */

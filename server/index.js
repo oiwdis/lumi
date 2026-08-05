@@ -521,6 +521,8 @@ const LANDING_LANGS = {
   'learn-japanese': { name: 'Japanese', speakers: '125M+' },
   'learn-korean':   { name: 'Korean',   speakers: '80M+'  },
   'learn-german':   { name: 'German',   speakers: '100M+' },
+  'learn-italian':  { name: 'Italian',  speakers: '65M+'  },
+  'learn-portuguese': { name: 'Portuguese', speakers: '260M+' },
 };
 
 const SITE_ORIGIN = process.env.SITE_ORIGIN ?? 'https://lumilanguage.com';
