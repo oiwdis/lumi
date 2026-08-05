@@ -170,6 +170,16 @@ interface SpeechRec {
   abort(): void;
 }
 
+// ── keyboard helpers ──────────────────────────────────────────────────────────
+
+/** True while the keystroke belongs to a field, which owns its own Enter key. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el || typeof el.tagName !== 'string') return false;
+  const tag = el.tagName.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+}
+
 // ── pronunciation scoring ─────────────────────────────────────────────────────
 
 // Matches Han, Hiragana/Katakana and Hangul. Accent-folding must be skipped for
@@ -796,6 +806,10 @@ export default function ConversationScreen() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!ls || !ex) return;
+      // The chat panel owns the keyboard while it is open, and any field owns its
+      // own Enter key. Without this, sending a chat message also submitted the
+      // lesson, and typing a digit in the chat re-picked the multiple-choice answer.
+      if (chatOpen || isTypingTarget(e.target)) return;
       if (e.key === 'Enter') {
         if (ls.checked) handleContinue();
         else if (ex.kind === 'mc' && ls.selected !== null) handleCheck();
@@ -808,7 +822,7 @@ export default function ConversationScreen() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [ls, ex, handleCheck, handleContinue]);
+  }, [ls, ex, chatOpen, handleCheck, handleContinue]);
 
   // ── TopBar ─────────────────────────────────────────────────────────────────
   const TopBar = ({ onBack }: { onBack: () => void }) => (
