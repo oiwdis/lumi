@@ -96,9 +96,20 @@ export default function App() {
   useEffect(() => {
     const mapped = PATH_TO_SCREEN[location.pathname];
     if (!mapped || mapped === screen) return;
-    if (PROTECTED.includes(mapped) && !user) { setScreen('home'); return; }
+    // These rewrite the URL themselves rather than relying on the screen effect:
+    // if the screen is already what we're falling back to, setScreen is a no-op
+    // and the address bar would keep showing the rejected path.
+    if (PROTECTED.includes(mapped) && !user) {
+      setScreen('home');
+      navigate('/', { replace: true });
+      return;
+    }
     // /lesson is meaningless without a chosen lesson — send them back to the path
-    if (mapped === 'chat' && !currentLessonId) { setScreen('path'); return; }
+    if (mapped === 'chat' && !currentLessonId) {
+      setScreen('path');
+      navigate('/path', { replace: true });
+      return;
+    }
     setScreen(mapped);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);

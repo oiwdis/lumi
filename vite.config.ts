@@ -24,19 +24,15 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            // Cache API calls for offline graceful fallback
-            urlPattern: /^\/api\//,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 5,
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
+        // Drop precaches from previous deploys instead of letting them accumulate
+        // and serve a stale mix of old and new assets.
+        cleanupOutdatedCaches: true,
+        // The SPA fallback must never answer an API request with index.html
+        navigateFallbackDenylist: [/^\/api\//],
+        // No runtime caching of /api. It used to hold GET /api/progress for 24
+        // hours, which on a shared device could serve one account's progress to
+        // whoever signed in next. Offline progress already comes from the
+        // persisted store in localStorage, so nothing is lost by dropping it.
       },
     }),
   ],

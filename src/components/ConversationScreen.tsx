@@ -121,11 +121,23 @@ function norm(s: string) {
     .replace(/[.!?,;]/g, '');
 }
 
+// Definite/indefinite articles across the shipped courses, plus the elided
+// forms (l', d', j'). Stripping these lets "el gato" pass for "gato".
+const LEADING_ARTICLE =
+  /^(?:(?:el|la|los|las|un|una|unos|unas|le|les|une|des|der|die|das|den|dem|ein|eine|il|lo|gli|os|as|um|uma)\s+|[ldj]')/;
+
+function stripArticle(s: string): string {
+  return s.replace(LEADING_ARTICLE, '').trim();
+}
+
 function checkType(input: string, ex: TypeExercise): boolean {
   const a = norm(input), b = norm(ex.answer);
   if (a === b) return true;
   if (ex.hint && norm(input) === norm(ex.hint)) return true;
-  if (a.includes(b) && b.length > 1) return true;
+  // Previously this accepted any input *containing* the answer, which marked a
+  // different real word correct 190 times across the courses — "Nein" passed for
+  // "Ei", "Merci" for "Mer", 넷 (four) for 네 (yes). Only an article may differ.
+  if (stripArticle(a) === stripArticle(b)) return true;
   return false;
 }
 
