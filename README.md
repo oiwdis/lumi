@@ -39,16 +39,22 @@ which is how production runs.
 
 ### Plans
 
-Free accounts get five *typed* tutor questions a day — the automatic tip after
+Free accounts get twenty *typed* tutor questions a day — the automatic tip after
 each answer is unlimited, since there are about thirteen per lesson. Pro lifts
 that, generates ten-unit courses instead of five, raises the hourly AI limits,
 and keeps lessons working offline.
 
-Stripe is on test keys, so the upgrade button is shown only to `ADMIN_EMAIL`.
-A real visitor pointed at test keys would be declined and would reasonably
-conclude the site is broken. Going live is: swap the keys, set
-`ALLOW_LIVE_STRIPE=yes`, register the production webhook endpoint, and widen
-`BETA_EMAILS` in `server/index.js`.
+Twenty is deliberately generous while Pro is unbuyable: throttling people costs
+goodwill and earns nothing when nobody can upgrade to escape it. Drop
+`FREE_TYPED_CHATS_PER_DAY` in `server/index.js` to 5 on the day Pro opens to
+everyone — it is the only place the number lives.
+
+Everyone sees the Pro pitch, but only `ADMIN_EMAIL` can reach checkout, and the
+price is shown only to them; everyone else sees "coming soon". Stripe is on test
+keys, and a real visitor pointed at test keys would be declined and would
+reasonably conclude the site is broken. Going live is: swap the keys, set
+`ALLOW_LIVE_STRIPE=yes`, register the production webhook endpoint, widen
+`BETA_EMAILS` in `server/index.js`, and drop the free allowance to 5.
 
 Webhooks are the only path that grants Pro — the browser returning from
 Checkout with `?checkout=success` proves nothing. Locally:

@@ -30,11 +30,16 @@ export default function LanguageSelect() {
         <p className="select-sub">Your goals. Your lessons. Your language.</p>
       </div>
 
-      {account.betaAccess && account.plan !== 'pro' && (
+      {/* Everyone sees the pitch; only the beta account can actually buy. The
+          price is withheld from everyone else — quoting a figure nobody can pay
+          reads worse than saying it isn't ready. */}
+      {account.plan !== 'pro' && (
         <button className="pro-banner" onClick={openProfile}>
           <span className="pro-banner-mark">✦</span>
           <span className="pro-banner-text">
-            <strong className="pro-banner-title">Go Pro — $8/mo</strong>
+            <strong className="pro-banner-title">
+              {account.betaAccess ? 'Go Pro — $8/mo' : 'Lumi Pro — coming soon'}
+            </strong>
             <span className="pro-banner-sub">Unlimited tutor · 10-unit courses · offline lessons</span>
           </span>
           <span className="pro-banner-arrow">→</span>

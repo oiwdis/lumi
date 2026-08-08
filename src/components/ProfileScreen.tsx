@@ -59,13 +59,15 @@ export default function ProfileScreen() {
             path is reachable only by the beta account — Stripe is on test keys,
             so a real visitor who tried to pay would be declined and would
             reasonably conclude the site is broken. */}
-        {account.betaAccess && account.plan !== 'pro' ? (
+        {account.plan !== 'pro' ? (
           <div className="plan-card plan-card--offer">
             <div className="plan-card-head">
               <span className="plan-card-mark">✦</span>
               <div>
                 <div className="plan-card-name">Lumi Pro</div>
-                <div className="plan-card-price">$8<span className="plan-card-per">/month</span></div>
+                {account.betaAccess
+                  ? <div className="plan-card-price">$8<span className="plan-card-per">/month</span></div>
+                  : <div className="plan-card-price plan-card-price--soon">Coming soon</div>}
               </div>
             </div>
             <ul className="plan-perks">
@@ -74,10 +76,22 @@ export default function ProfileScreen() {
               <li>Lessons keep working offline</li>
               <li>Higher limits on everything AI</li>
             </ul>
-            <button className="plan-btn" disabled={billingBusy} onClick={() => openBilling('/api/stripe/checkout')}>
-              {billingBusy ? 'Opening…' : 'Upgrade to Pro →'}
-            </button>
-            <p className="plan-card-note">Beta — test mode. No real card is charged.</p>
+            {account.betaAccess ? (
+              <>
+                <button className="plan-btn" disabled={billingBusy} onClick={() => openBilling('/api/stripe/checkout')}>
+                  {billingBusy ? 'Opening…' : 'Upgrade to Pro →'}
+                </button>
+                <p className="plan-card-note">Beta — test mode. No real card is charged.</p>
+              </>
+            ) : (
+              <p className="plan-card-note plan-card-note--free">
+                Not on sale yet. You're on the free plan
+                {account.chatLimit !== null && (
+                  <> — {Math.max(0, account.chatLimit - account.typedChatsToday)} of {account.chatLimit} tutor
+                  questions left today</>
+                )}.
+              </p>
+            )}
             {billingError && <p className="plan-card-error">{billingError}</p>}
           </div>
         ) : (

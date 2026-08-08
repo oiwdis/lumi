@@ -265,9 +265,15 @@ const ADMIN_EMAIL = normEmail(process.env.ADMIN_EMAIL ?? 'elliot@themaclan.com')
 const BETA_EMAILS = new Set([ADMIN_EMAIL]);
 const hasBetaAccess = email => BETA_EMAILS.has(normEmail(email));
 
+// Typed tutor questions a free account gets per day. Deliberately generous
+// while Pro is unbuyable — throttling people costs goodwill and earns nothing,
+// since nobody outside the beta can upgrade to escape it. Drop this to 5 on the
+// day Pro opens to everyone; it is the only place the number lives.
+const FREE_TYPED_CHATS_PER_DAY = 20;
+
 const LIMITS = {
-  free: { tutorPerHour: 120, customizePerHour: 12, typedChatsPerDay: 5,  units: '4–5'  },
-  pro:  { tutorPerHour: 600, customizePerHour: 60, typedChatsPerDay: Infinity, units: '9–10' },
+  free: { tutorPerHour: 120, customizePerHour: 12, typedChatsPerDay: FREE_TYPED_CHATS_PER_DAY, units: '4–5'  },
+  pro:  { tutorPerHour: 600, customizePerHour: 60, typedChatsPerDay: Infinity,                 units: '9–10' },
 };
 
 /** 'pro' only while the subscription is actually live. */
