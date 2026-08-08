@@ -291,14 +291,13 @@ export const useAppStore = create<AppStore>()(
       goalUpdatedAt: {},
 
       login: (user, token?: string) => {
+        // One account used to be handed 9999 XP and a 999-day streak here, and
+        // the branch returned early — so that account also never pulled its real
+        // progress or its plan from the server, and the invented figures were
+        // saved and synced as if they had been earned. Every account now starts
+        // from what it actually has.
         const localProgress = loadProgress(user.id);
         localStorage.setItem('lumi-user', JSON.stringify(user));
-        if (user.email === 'elliot@themaclan.com') {
-          const adminProgress: UserProgress = { ...localProgress, xp: 9999, streak: 999 };
-          saveProgress(user.id, adminProgress);
-          set({ user, screen: 'select', ...adminProgress });
-          return;
-        }
         set({ user, screen: 'select', ...localProgress });
         const authToken = token ?? localStorage.getItem('lumi-token');
         if (authToken) {
@@ -433,7 +432,15 @@ export const useAppStore = create<AppStore>()(
         if (s.user) saveProgress(s.user.id, { ...getFullProgress(s), xp: newXp, streak: newStreak, lastSessionDate: todayStr });
       },
 
-      resetProgress: () => set({ xp: 0, streak: 0, lastSessionDate: null, completedLessons: {}, customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {}, goalUpdatedAt: {} }),
+      // Clearing local state alone achieved nothing: mergeProgress keeps the
+      // higher XP, so the next sync pulled the old figures straight back off
+      // the server. The cleared state has to be pushed as well.
+      resetProgress: () => {
+        const s = get();
+        const cleared = emptyProgress();
+        set(cleared);
+        if (s.user) saveProgress(s.user.id, cleared);
+      },
     }),
     {
       name: 'lumi-v2',

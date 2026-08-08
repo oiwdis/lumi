@@ -6,8 +6,9 @@ import { COURSES } from '../data';
 import Avatar from './Avatar';
 
 export default function ProfileScreen() {
-  const { user, xp, streak, completedLessons, account, refreshPlan, goBack } = useAppStore();
+  const { user, xp, streak, completedLessons, account, refreshPlan, resetProgress, goBack } = useAppStore();
   const [billingBusy, setBillingBusy] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [billingError, setBillingError] = useState('');
 
   // Coming back from Stripe, the plan is granted by webhook rather than by this
@@ -203,6 +204,27 @@ export default function ProfileScreen() {
         </div>
 
         <div style={{ height: 40 }} />
+        {/* Destructive, so it asks twice. Progress is cleared on the server as
+            well as locally — clearing only locally left the next sync free to
+            pull the old numbers back. */}
+        <div className="profile-danger">
+          {confirmReset ? (
+            <>
+              <p className="profile-danger-warn">
+                This erases your XP, streak and every completed lesson, on this device and on
+                your account. It cannot be undone.
+              </p>
+              <div className="profile-danger-actions">
+                <button className="profile-danger-btn" onClick={() => { resetProgress(); setConfirmReset(false); }}>
+                  Yes, erase my progress
+                </button>
+                <button className="profile-danger-cancel" onClick={() => setConfirmReset(false)}>Cancel</button>
+              </div>
+            </>
+          ) : (
+            <button className="profile-danger-link" onClick={() => setConfirmReset(true)}>Reset progress</button>
+          )}
+        </div>
       </div>
     </div>
   );

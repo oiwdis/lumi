@@ -3164,3 +3164,57 @@ a.home-cta-btn { display: inline-block; text-decoration: none; }
 
 .plan-card-price--soon { font-size: 15px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
 .plan-card-note--free { text-align: left; color: var(--muted); margin-top: 4px; }
+
+/* Reset progress — deliberately quiet until confirmed */
+.profile-danger {
+  margin: 28px 0 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.profile-danger-link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 6px;
+}
+
+.profile-danger-link:hover { color: var(--red, #ff4b4b); }
+
+.profile-danger-warn {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+
+.profile-danger-actions { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+
+.profile-danger-btn {
+  padding: 10px 18px;
+  border-radius: 11px;
+  border: 1px solid var(--red, #ff4b4b);
+  background: transparent;
+  color: var(--red, #ff4b4b);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-danger-btn:hover { background: color-mix(in srgb, var(--red, #ff4b4b) 12%, transparent); }
+
+.profile-danger-cancel {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+}
