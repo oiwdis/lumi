@@ -1280,8 +1280,12 @@ a.home-cta-btn { display: inline-block; text-decoration: none; }
     grid-template-columns: 1fr 360px;
     gap: 56px;
     padding-bottom: 80px;
+    /* Top-aligned, not centred. The phone mockup is much taller than the two
+       lines beside it, so centring left the copy floating in the middle of a
+       tall empty column. */
+    align-items: start;
   }
-  .pd-copy { text-align: left; }
+  .pd-copy { text-align: left; padding-top: 6px; }
   .pd-title { font-size: 32px; }
   .pd-sub { font-size: 16px; }
 }
@@ -1595,8 +1599,44 @@ a.home-cta-btn { display: inline-block; text-decoration: none; }
 .home-cta-strip-sub {
   color: var(--muted);
   font-size: 15px;
-  margin: 0 0 8px;
+  margin: 0 0 4px;
 }
+
+.home-cta-strip-note {
+  color: var(--muted);
+  font-size: 13px;
+  opacity: 0.75;
+  margin: 0 0 14px;
+}
+
+/* Being upfront about how early this is, in place of testimonials */
+.home-early {
+  text-align: center;
+  padding: 0 24px 40px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.home-early-line {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.home-early-sub {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.home-early-mail {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.home-early-mail:hover { border-bottom-color: var(--accent); }
 
 .home-footer {
   position: relative;

@@ -76,7 +76,30 @@ export default function HomeScreen({ onGetStarted, lang, onPickLang }: Props) {
           Tell Lumi your goal. Get a personalized {langName ?? ''} curriculum in 15 seconds.<br />
           Practice with an AI tutor that actually explains things.
         </p>
-        <a className="home-cta-btn" href="#try">
+        {/* Stays a real link so it works without JS and reads as one to
+            crawlers, but the click is handled so it glides down and drops the
+            cursor straight in the goal box rather than jumping. It must never
+            lead to signup — the section it lands on says "no account needed". */}
+        <a
+          className="home-cta-btn"
+          href="#try"
+          onClick={e => {
+            const target = document.getElementById('try');
+            if (!target) return;              // fall back to the plain anchor jump
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            window.setTimeout(() => {
+              // Not every engine animates a smooth scroll — land it either way,
+              // or the button would do nothing at all where it doesn't.
+              if (Math.abs(target.getBoundingClientRect().top) > 80) {
+                target.scrollIntoView({ block: 'start' });
+              }
+              // preventScroll, or focusing the field yanks the section heading
+              // back off the top of the screen.
+              document.getElementById('gd-goal')?.focus({ preventScroll: true });
+            }, 450);
+          }}
+        >
           Build my first lesson →
         </a>
         <div className="home-lang-pills">
@@ -93,12 +116,14 @@ export default function HomeScreen({ onGetStarted, lang, onPickLang }: Props) {
         </div>
       </section>
 
-      {/* Product visual — fills the gap between the hero and the features.
-          Keyed by course so switching language restarts the animation cleanly. */}
-      <ProductDemo key={demoCourse} courseId={demoCourse} langName={demoLangName} />
-
-      {/* Try-before-signup generator */}
+      {/* The generator comes first on purpose. It is the only thing on the page
+          that proves the claim instead of repeating it, and when it sat below
+          the product demo most visitors never scrolled far enough to reach it. */}
       <GoalDemo defaultCourse={demoCourse} onGetStarted={onGetStarted} />
+
+      {/* Product visual. Keyed by course so switching language restarts the
+          animation cleanly. */}
+      <ProductDemo key={demoCourse} courseId={demoCourse} langName={demoLangName} />
 
       {/* Features */}
       <section className="home-features">
@@ -114,11 +139,23 @@ export default function HomeScreen({ onGetStarted, lang, onPickLang }: Props) {
         </div>
       </section>
 
-      {/* Bottom CTA */}
+      {/* Bottom CTA. "Free to start" on its own invites the question of what
+          happens after, which is a reason to leave and go find out. */}
       <section className="home-cta-strip">
         <h2 className="home-cta-strip-title">Ready to actually learn?</h2>
-        <p className="home-cta-strip-sub">Free to start. No credit card. No fluff.</p>
+        <p className="home-cta-strip-sub">Free while it's early — no credit card.</p>
+        <p className="home-cta-strip-note">Paid plans come later. Whatever you build now stays yours.</p>
         <button className="home-cta-btn" onClick={onGetStarted}>Create your account →</button>
+      </section>
+
+      {/* Said plainly rather than papered over with testimonials. The people who
+          find this first are the ones who root for early software. */}
+      <section className="home-early">
+        <p className="home-early-line">Built by one person, and it's early.</p>
+        <p className="home-early-sub">
+          If something's broken or wrong, tell me:{' '}
+          <a className="home-early-mail" href="mailto:elliot@themaclan.com">elliot@themaclan.com</a>
+        </p>
       </section>
 
       <footer className="home-footer">
