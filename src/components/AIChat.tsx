@@ -15,11 +15,13 @@ interface Props {
   onSend: (text: string, isPronunciation?: boolean) => void;
   currentWord?: { target: string; english: string; hint?: string };
   langName: string;
+  /** Typed questions left today, or null when unlimited. */
+  chatsLeft?: number | null;
 }
 
 export default function AIChat({
   isOpen, onToggle, messages, isLoading, unread,
-  onSend, currentWord, langName,
+  onSend, currentWord, langName, chatsLeft,
 }: Props) {
   const [input, setInput] = useState('');
   const [listening, setListening] = useState(false);
@@ -117,7 +119,14 @@ export default function AIChat({
         <div className="chat-panel">
           <div className="chat-header">
             <span className="chat-header-title">🌱 Lumi</span>
-            {currentWord && (
+            {typeof chatsLeft === 'number' ? (
+              // Better to see the allowance before typing than to be refused after
+              <span className={`chat-header-hint${chatsLeft <= 1 ? ' chat-header-hint--low' : ''}`}>
+                {chatsLeft > 0
+                  ? `${chatsLeft} question${chatsLeft === 1 ? '' : 's'} left today`
+                  : 'No questions left today'}
+              </span>
+            ) : currentWord && (
               <span className="chat-header-hint">
                 Tap 🎤 to practice <strong>{currentWord.target}</strong>
               </span>

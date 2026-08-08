@@ -31,7 +31,31 @@ which is how production runs.
 | `RESEND_API_KEY` | password-reset emails; without it the link is logged to stdout |
 | `APP_URL` | base URL used in reset links |
 | `SITE_ORIGIN` | canonical/sitemap origin, defaults to `https://lumilanguage.com` |
-| `ADMIN_EMAIL` | who may call `/api/admin/users` |
+| `ADMIN_EMAIL` | who may call `/api/admin/users`, and the only account that can reach the upgrade flow |
+| `TOKEN_SECRET` | signs session tokens; falls back to a value derived from `DATABASE_URL`, but set it |
+| `STRIPE_SECRET_KEY` | Pro checkout; without it the upgrade flow is hidden and the app runs as before |
+| `STRIPE_WEBHOOK_SECRET` | verifying Stripe webhooks — the only thing that grants or revokes Pro |
+| `ALLOW_LIVE_STRIPE` | must be `yes` before the server will boot with an `sk_live_` key |
+
+### Plans
+
+Free accounts get five *typed* tutor questions a day — the automatic tip after
+each answer is unlimited, since there are about thirteen per lesson. Pro lifts
+that, generates ten-unit courses instead of five, raises the hourly AI limits,
+and keeps lessons working offline.
+
+Stripe is on test keys, so the upgrade button is shown only to `ADMIN_EMAIL`.
+A real visitor pointed at test keys would be declined and would reasonably
+conclude the site is broken. Going live is: swap the keys, set
+`ALLOW_LIVE_STRIPE=yes`, register the production webhook endpoint, and widen
+`BETA_EMAILS` in `server/index.js`.
+
+Webhooks are the only path that grants Pro — the browser returning from
+Checkout with `?checkout=success` proves nothing. Locally:
+
+```
+stripe listen --forward-to localhost:3001/api/stripe/webhook
+```
 
 ## Layout
 

@@ -320,12 +320,16 @@ async function fetchAIResponse(
   prompt: string, systemPrompt: string,
   onChunk: (t: string) => void,
   history: TutorTurn[] = [],
+  // True only for a question the learner typed. The automatic tip after each
+  // answer must not count against the free daily allowance — there are about
+  // thirteen per lesson, which would spend five before the first one ended.
+  typed = false,
 ): Promise<void> {
   try {
     const res = await fetch('/api/tutor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ messages: [...history, { role: 'user', content: prompt }], systemPrompt }),
+      body: JSON.stringify({ messages: [...history, { role: 'user', content: prompt }], systemPrompt, typed }),
     });
     if (!res.ok) {
       // Say why. Swallowing this left the tutor silently dead on 401/429.
@@ -353,7 +357,7 @@ async function fetchAIResponse(
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function ConversationScreen() {
-  const { selectedCourse, currentLessonId, user, xp, streak, customLessons, wordStats, theme, addXp, recordAnswer, goBack, completeLesson, logout, toggleTheme } = useAppStore();
+  const { selectedCourse, currentLessonId, user, xp, streak, customLessons, wordStats, theme, account, addXp, recordAnswer, refreshPlan, goBack, completeLesson, logout, toggleTheme } = useAppStore();
   const usesCharPicker = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
   const showReadings = selectedCourse === 'en-zh' || selectedCourse === 'en-ja' || selectedCourse === 'en-ko';
 
@@ -674,9 +678,10 @@ export default function ConversationScreen() {
     await fetchAIResponse(prompt, systemPrompt, chunk => {
       accumulated += chunk;
       setChatMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulated } : m));
-    }, history);
+    }, history, !isPronunciation);
     setChatLoading(false);
-  }, [ex, flashIdx, topic, langName, chatMessages]);
+    refreshPlan();
+  }, [ex, flashIdx, topic, langName, chatMessages, refreshPlan]);
 
   // ── pronunciation tap ─────────────────────────────────────────────────────────
   const recognitionRef = useRef<SpeechRec | null>(null);
@@ -1333,6 +1338,7 @@ export default function ConversationScreen() {
           onSend={handleChatSend}
           currentWord={ex && ex.kind !== 'pairs' && ex.kind !== 'flash' ? { target: (ex as MCExercise | TypeExercise).word.target, english: (ex as MCExercise | TypeExercise).word.english } : undefined}
           langName={langName}
+          chatsLeft={account.chatLimit === null ? null : Math.max(0, account.chatLimit - account.typedChatsToday)}
         />
       </div>
     );

@@ -52,6 +52,8 @@ export default function App() {
   const user = useAppStore(s => s.user);
   const currentLessonId = useAppStore(s => s.currentLessonId);
   const openOnboarding = useAppStore(s => s.openOnboarding);
+  const account = useAppStore(s => s.account);
+  const refreshPlan = useAppStore(s => s.refreshPlan);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
   // Screens that have their own theme toggle built into their UI
@@ -69,6 +71,11 @@ export default function App() {
   useEffect(() => {
     document.body.classList.toggle('light', theme === 'light');
   }, [theme]);
+
+  // Entitlements are deliberately not persisted — a stale 'pro' in localStorage
+  // would light up the UI for someone whose subscription had lapsed — so a
+  // returning session has to ask for them on mount, not only on sign-in.
+  useEffect(() => { if (user) refreshPlan(); }, [user, refreshPlan]);
 
   // Re-sync from server when tab becomes visible (handles multi-device use)
   useEffect(() => {
@@ -172,15 +179,39 @@ export default function App() {
             <span className="offline-banner-icon">📶</span>
             <div className="offline-banner-text">
               <strong>You're offline</strong>
-              <span className="offline-banner-rows">
-                <span className="offline-row offline-row--ok">✓ Lessons &amp; exercises</span>
-                <span className="offline-row offline-row--ok">✓ Your progress &amp; stats</span>
-                <span className="offline-row offline-row--no">✗ AI chat tutor</span>
-                <span className="offline-row offline-row--no">✗ Sign in / sign up</span>
-              </span>
+              {account.plan === 'pro' ? (
+                <span className="offline-banner-rows">
+                  <span className="offline-row offline-row--ok">✓ Lessons &amp; exercises</span>
+                  <span className="offline-row offline-row--ok">✓ Your progress &amp; stats</span>
+                  <span className="offline-row offline-row--no">✗ AI chat tutor</span>
+                  <span className="offline-row offline-row--no">✗ Sign in / sign up</span>
+                </span>
+              ) : (
+                <span className="offline-banner-rows">
+                  <span className="offline-row offline-row--ok">✓ Your progress is saved</span>
+                  <span className="offline-row offline-row--no">✗ Lessons need a connection on the free plan</span>
+                </span>
+              )}
             </div>
           </div>
           <button className="offline-banner-close" onClick={() => setOfflineBannerDismissed(true)}>✕</button>
+        </div>
+      )}
+
+      {/* Offline lessons are a Pro perk. This is a prompt rather than real
+          enforcement — the lesson data is already cached on the device — but it
+          is the honest place to say so. */}
+      {!isOnline && account.plan !== 'pro' && user && (
+        <div className="offline-gate">
+          <div className="offline-gate-card">
+            <div className="offline-gate-icon">📶</div>
+            <h2 className="offline-gate-title">You're offline</h2>
+            <p className="offline-gate-sub">
+              Offline lessons are part of Lumi Pro. Reconnect to carry on — everything you've
+              done is saved and will sync when you're back.
+            </p>
+            <button className="offline-gate-btn" onClick={() => setScreen('profile')}>See Pro →</button>
+          </div>
         </div>
       )}
       {!screensWithOwnToggle.includes(screen) && (

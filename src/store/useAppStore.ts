@@ -171,6 +171,39 @@ export interface CustomUnit { id: string; title: string; subtitle: string; emoji
 
 interface AuthUser { id: string; name: string; email: string; }
 
+/**
+ * What the account is entitled to. The server decides all of this and enforces
+ * it independently — this copy only decides what the UI shows.
+ */
+export interface Account {
+  plan: 'free' | 'pro';
+  /** Whether the upgrade flow is reachable at all. Stripe is on test keys, so
+   *  it stays hidden from everyone except the beta account. */
+  betaAccess: boolean;
+  typedChatsToday: number;
+  /** null means unlimited */
+  chatLimit: number | null;
+}
+
+const FREE_ACCOUNT: Account = { plan: 'free', betaAccess: false, typedChatsToday: 0, chatLimit: 5 };
+
+async function fetchAccount(): Promise<Account | null> {
+  const token = localStorage.getItem('lumi-token');
+  if (!token) return null;
+  try {
+    const res = await fetch('/api/me', { headers: { 'Authorization': `Bearer ${token}` } });
+    if (res.status === 401) { expireSession(); return null; }
+    if (!res.ok) return null;
+    const d = await res.json();
+    return {
+      plan: d.plan === 'pro' ? 'pro' : 'free',
+      betaAccess: !!d.betaAccess,
+      typedChatsToday: Number(d.typedChatsToday) || 0,
+      chatLimit: d.limits?.typedChatsPerDay ?? null,
+    };
+  } catch { return null; }
+}
+
 interface AppStore {
   screen: Screen;
   theme: 'dark' | 'light';
@@ -186,8 +219,11 @@ interface AppStore {
   goalSkipped: Record<string, boolean>;
   wordStats: Record<string, WordStat>;
   goalUpdatedAt: Record<string, number>;
+  /** Billing state, owned by the server — never written from the client. */
+  account: Account;
 
   setScreen: (screen: Screen) => void;
+  refreshPlan: () => void;
   toggleTheme: () => void;
   login: (user: AuthUser, token?: string) => void;
   logout: () => void;
@@ -237,6 +273,7 @@ export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
       screen: initialScreen(),
+      account: FREE_ACCOUNT,
       theme: (() => { try { return (localStorage.getItem('lumi-theme') as 'dark' | 'light') ?? 'dark'; } catch { return 'dark'; } })(),
       user: (() => {
         try { const u = localStorage.getItem('lumi-user'); return u ? JSON.parse(u) : null; } catch { return null; }
@@ -265,6 +302,7 @@ export const useAppStore = create<AppStore>()(
         set({ user, screen: 'select', ...localProgress });
         const authToken = token ?? localStorage.getItem('lumi-token');
         if (authToken) {
+          fetchAccount().then(a => { if (a) set({ account: a }); });
           // Flush any queued offline progress first, then pull from server
           flushSyncQueue();
           fetch('/api/progress', { headers: { 'Authorization': `Bearer ${authToken}` } })
@@ -285,6 +323,7 @@ export const useAppStore = create<AppStore>()(
         if (!s.user) return;
         const token = localStorage.getItem('lumi-token');
         if (!token || !navigator.onLine) return;
+        fetchAccount().then(a => { if (a) set({ account: a }); });
         flushSyncQueue();
         fetch('/api/progress', { headers: { 'Authorization': `Bearer ${token}` } })
           .then(r => { if (r.status === 401) { expireSession(); return null; } return r.ok ? r.json() : null; })
@@ -297,6 +336,8 @@ export const useAppStore = create<AppStore>()(
           })
           .catch(() => {});
       },
+
+      refreshPlan: () => { fetchAccount().then(a => { if (a) set({ account: a }); }); },
 
       setScreen: (screen) => set({ screen }),
 
@@ -312,7 +353,7 @@ export const useAppStore = create<AppStore>()(
         if (s.user) saveProgress(s.user.id, getFullProgress(s));
         localStorage.removeItem('lumi-token');
         localStorage.removeItem('lumi-user');
-        set({ user: null, screen: 'home', selectedCourse: null, currentLessonId: null,
+        set({ user: null, account: FREE_ACCOUNT, screen: 'home', selectedCourse: null, currentLessonId: null,
           completedLessons: {}, xp: 0, streak: 0, lastSessionDate: null,
           customLessons: {}, customGoal: {}, goalSkipped: {}, wordStats: {}, goalUpdatedAt: {} });
       },
@@ -397,7 +438,10 @@ export const useAppStore = create<AppStore>()(
     {
       name: 'lumi-v2',
       partialize: (s) => {
-        const { screen: _screen, ...rest } = s;
+        // `account` is deliberately not persisted. A stale 'pro' in localStorage
+        // would light up the UI for someone whose subscription had lapsed; it is
+        // re-fetched on every login and tab focus instead.
+        const { screen: _screen, account: _account, ...rest } = s;
         return rest;
       },
       // No onRehydrateStorage reset here. `screen` is partialized out, so the

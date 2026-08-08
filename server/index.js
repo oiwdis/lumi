@@ -8,6 +8,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
 import { promisify } from 'util';
 import pg from 'pg';
+import Stripe from 'stripe';
 
 const { Pool } = pg;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,12 @@ if (process.env.DATABASE_URL) {
     // Add reset columns if they don't exist yet (for existing tables)
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT`).catch(() => {});
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires BIGINT`).catch(() => {});
+    // Billing. Nullable throughout: every existing row is a free account.
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_until BIGINT`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS typed_chats JSONB`).catch(() => {});
     console.log('PostgreSQL ready');
   }).catch(err => console.error('DB init error:', err.message));
 }
@@ -248,10 +255,179 @@ async function upgradeStoredHash(email, password, oldHash) {
   return upgraded;
 }
 
+// ── Plans ────────────────────────────────────────────────────────────────────
+
+const ADMIN_EMAIL = normEmail(process.env.ADMIN_EMAIL ?? 'elliot@themaclan.com');
+
+// Who can reach the upgrade flow at all. Stripe is running on test keys, so a
+// real visitor who tried to pay would just get declined and conclude the site
+// is broken — the checkout stays invisible to everyone else until it goes live.
+const BETA_EMAILS = new Set([ADMIN_EMAIL]);
+const hasBetaAccess = email => BETA_EMAILS.has(normEmail(email));
+
+const LIMITS = {
+  free: { tutorPerHour: 120, customizePerHour: 12, typedChatsPerDay: 5,  units: '4–5'  },
+  pro:  { tutorPerHour: 600, customizePerHour: 60, typedChatsPerDay: Infinity, units: '9–10' },
+};
+
+/** 'pro' only while the subscription is actually live. */
+function planOf(row) {
+  if (!row) return 'free';
+  const until = Number(row.plan_until ?? row.planUntil ?? 0);
+  const plan = row.plan ?? 'free';
+  if (plan !== 'pro') return 'free';
+  // Stripe tells us when it lapses; the timestamp is the backstop if a
+  // cancellation webhook is ever missed.
+  if (until && until < Date.now()) return 'free';
+  return 'pro';
+}
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Free accounts get five *typed* tutor questions a day. The tip that fires
+ * automatically after every answer is not counted — there are about thirteen
+ * per lesson, so counting those would spend the whole allowance before the
+ * first lesson ended.
+ */
+function countTypedToday(row) {
+  const rec = row?.typed_chats ?? row?.typedChats;
+  if (!rec || rec.date !== todayStr()) return 0;
+  return Number(rec.count) || 0;
+}
+
+async function bumpTypedToday(email, row) {
+  const next = { date: todayStr(), count: countTypedToday(row) + 1 };
+  await writeUserFields(email, pool ? { typed_chats: next } : { typedChats: next });
+  return next.count;
+}
+
+async function readUserRow(email) {
+  const target = normEmail(email);
+  if (pool) {
+    const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [target]);
+    return rows[0] ?? null;
+  }
+  const users = loadUsers();
+  const key = findUserKey(users, target);
+  return key ? users[key] : null;
+}
+
+async function writeUserFields(email, fields) {
+  if (pool) {
+    const keys = Object.keys(fields);
+    const sets = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+    await pool.query(
+      `UPDATE users SET ${sets} WHERE LOWER(email) = $${keys.length + 1}`,
+      [...keys.map(k => fields[k]), normEmail(email)],
+    );
+  } else {
+    const users = loadUsers();
+    const key = findUserKey(users, email);
+    if (!key) return;
+    Object.assign(users[key], fields);
+    saveUsers(users);
+  }
+}
+
+// ── Stripe ───────────────────────────────────────────────────────────────────
+// Absent keys are not an error: the endpoints answer 503 and the client hides
+// the upgrade entry point, so the app runs exactly as before without them.
+
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+if (stripe && process.env.STRIPE_SECRET_KEY.startsWith('sk_live_') && process.env.ALLOW_LIVE_STRIPE !== 'yes') {
+  // Refusing to boot beats discovering the mix-up because a real card was
+  // charged. Set ALLOW_LIVE_STRIPE=yes deliberately when going live.
+  console.error('Refusing to start: STRIPE_SECRET_KEY is a live key but ALLOW_LIVE_STRIPE is not set to "yes".');
+  process.exit(1);
+}
+
+const PRO_PRICE_CENTS = 800;   // $8/mo placeholder — change here and in Stripe
+
+/**
+ * The only place a plan is granted or revoked. Never trust the browser coming
+ * back from Checkout with "?checkout=success" — that URL is just a URL, and
+ * anyone can visit it.
+ */
+async function handleStripeEvent(event) {
+  const obj = event.data.object;
+
+  if (event.type === 'checkout.session.completed') {
+    const email = normEmail(obj.metadata?.lumiEmail || obj.customer_email);
+    if (!email) return;
+    // The session says paid; the subscription says how long for.
+    let until = 0;
+    if (obj.subscription) {
+      const sub = await stripe.subscriptions.retrieve(obj.subscription);
+      until = (sub.current_period_end ?? 0) * 1000;
+    }
+    await writeUserFields(email, pool
+      ? { plan: 'pro', plan_until: until || null, stripe_customer_id: obj.customer ?? null, stripe_subscription_id: obj.subscription ?? null }
+      : { plan: 'pro', planUntil: until || null, stripeCustomerId: obj.customer ?? null, stripeSubscriptionId: obj.subscription ?? null });
+    console.log(`stripe: ${email} is now pro`);
+    return;
+  }
+
+  if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+    const email = await emailForCustomer(obj.customer);
+    if (!email) return;
+    // 'active' and 'trialing' are the only states that should keep the perks.
+    const live = event.type !== 'customer.subscription.deleted'
+      && (obj.status === 'active' || obj.status === 'trialing');
+    const until = (obj.current_period_end ?? 0) * 1000;
+    await writeUserFields(email, pool
+      ? { plan: live ? 'pro' : 'free', plan_until: live ? until || null : null }
+      : { plan: live ? 'pro' : 'free', planUntil: live ? until || null : null });
+    console.log(`stripe: ${email} -> ${live ? 'pro' : 'free'} (${obj.status})`);
+  }
+}
+
+/** Subscription events carry a customer id, not an address. */
+async function emailForCustomer(customerId) {
+  if (!customerId) return null;
+  if (pool) {
+    const { rows } = await pool.query('SELECT email FROM users WHERE stripe_customer_id = $1', [customerId]);
+    if (rows[0]) return rows[0].email;
+  } else {
+    const users = loadUsers();
+    const hit = Object.values(users).find(u => u.stripeCustomerId === customerId);
+    if (hit) return hit.email;
+  }
+  // Not linked yet (first event can race the checkout row) — ask Stripe
+  try {
+    const cust = await stripe.customers.retrieve(customerId);
+    return normEmail(cust?.metadata?.lumiEmail || cust?.email) || null;
+  } catch { return null; }
+}
+
 // ── App ──────────────────────────────────────────────────────────────────────
 
 const app = express();
 app.use(cors());
+
+// Before express.json(). Stripe signs the raw bytes, and a parsed body fails
+// verification every time — this ordering is the whole trick.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(503).end();
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('stripe webhook signature rejected:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    await handleStripeEvent(event);
+  } catch (err) {
+    // 500 makes Stripe retry, which is what we want if our DB was briefly down
+    console.error('stripe webhook handler failed:', event.type, err.message);
+    return res.status(500).end();
+  }
+  res.json({ received: true });
+});
+
 app.use(express.json());
 
 // Serve the built Vite frontend in production
@@ -338,7 +514,6 @@ app.post('/api/auth/login', async (req, res) => {
 // Admin — list all users (only accessible by elliot@themaclan.com)
 app.get('/api/admin/users', async (req, res) => {
   const auth = await getAuthUser(req);
-  const ADMIN_EMAIL = normEmail(process.env.ADMIN_EMAIL ?? 'elliot@themaclan.com');
   if (!auth || normEmail(auth.email) !== ADMIN_EMAIL) return res.status(403).json({ error: 'Forbidden' });
 
   if (pool) {
@@ -402,6 +577,78 @@ app.post('/api/progress', async (req, res) => {
     saveUsers(users);
   }
   res.json({ ok: true });
+});
+
+// Who am I and what do I get — the client renders from this, the server enforces it
+app.get('/api/me', async (req, res) => {
+  const auth = await getAuthUser(req);
+  if (!auth) return res.status(401).json({ error: 'Unauthorized' });
+  const row = await readUserRow(auth.email);
+  const plan = planOf(row);
+  res.json({
+    email: auth.email,
+    plan,
+    // Without a key there is nothing to upgrade to, so the button stays hidden
+    betaAccess: hasBetaAccess(auth.email) && !!stripe,
+    limits: { typedChatsPerDay: LIMITS[plan].typedChatsPerDay === Infinity ? null : LIMITS[plan].typedChatsPerDay },
+    typedChatsToday: countTypedToday(row),
+  });
+});
+
+app.post('/api/stripe/checkout', async (req, res) => {
+  const auth = await getAuthUser(req);
+  if (!auth) return res.status(401).json({ error: 'Please sign in first.' });
+  if (!stripe) return res.status(503).json({ error: 'Payments are not configured.' });
+  if (!hasBetaAccess(auth.email)) return res.status(403).json({ error: 'Pro is not open yet.' });
+
+  const row = await readUserRow(auth.email);
+  if (planOf(row) === 'pro') return res.status(409).json({ error: 'You are already on Pro.' });
+
+  const origin = req.headers.origin || process.env.APP_URL || 'http://localhost:5173';
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: row?.stripe_customer_id ?? row?.stripeCustomerId ?? undefined,
+      customer_email: (row?.stripe_customer_id ?? row?.stripeCustomerId) ? undefined : auth.email,
+      // The webhook reads this back — it is the only link from a payment to an account
+      metadata: { lumiEmail: auth.email },
+      subscription_data: { metadata: { lumiEmail: auth.email } },
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency: 'usd',
+          unit_amount: PRO_PRICE_CENTS,
+          recurring: { interval: 'month' },
+          product_data: { name: 'Lumi Pro', description: 'Unlimited tutor chat, 10-unit courses, offline lessons, higher AI limits' },
+        },
+      }],
+      success_url: `${origin}/profile?checkout=success`,
+      cancel_url: `${origin}/profile?checkout=cancelled`,
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('stripe checkout failed:', err.message);
+    res.status(500).json({ error: 'Could not start checkout. Please try again.' });
+  }
+});
+
+// Cancel / update card, hosted by Stripe. Also how a test subscription gets
+// cancelled so the downgrade webhook can be exercised.
+app.post('/api/stripe/portal', async (req, res) => {
+  const auth = await getAuthUser(req);
+  if (!auth) return res.status(401).json({ error: 'Please sign in first.' });
+  if (!stripe) return res.status(503).json({ error: 'Payments are not configured.' });
+  const row = await readUserRow(auth.email);
+  const customer = row?.stripe_customer_id ?? row?.stripeCustomerId;
+  if (!customer) return res.status(404).json({ error: 'No billing account yet.' });
+  const origin = req.headers.origin || process.env.APP_URL || 'http://localhost:5173';
+  try {
+    const portal = await stripe.billingPortal.sessions.create({ customer, return_url: `${origin}/profile` });
+    res.json({ url: portal.url });
+  } catch (err) {
+    console.error('stripe portal failed:', err.message);
+    res.status(500).json({ error: 'Could not open billing. Please try again.' });
+  }
 });
 
 // Forgot password — generate token and send email via Resend
@@ -506,12 +753,31 @@ const customizeHits = new Map();  // email -> timestamps
 
 // AI Tutor (streaming)
 app.post('/api/tutor', async (req, res) => {
-  const { messages, systemPrompt } = req.body;
+  const { messages, systemPrompt, typed } = req.body;
 
   const auth = await getAuthUser(req);
   if (!auth) return res.status(401).json({ error: 'Please sign in to use the tutor.' });
-  if (overLimit(tutorHits, auth.email, 120, 3600_000)) {
+
+  const row = await readUserRow(auth.email);
+  const plan = planOf(row);
+  const limits = LIMITS[plan];
+
+  if (overLimit(tutorHits, auth.email, limits.tutorPerHour, 3600_000)) {
     return res.status(429).json({ error: 'You have sent a lot of messages this hour — try again shortly.' });
+  }
+
+  // `typed` marks a question the learner actually wrote, as opposed to the
+  // automatic tip after each answer. Only the former counts against the daily
+  // allowance, and only for free accounts.
+  if (typed && limits.typedChatsPerDay !== Infinity) {
+    const used = countTypedToday(row);
+    if (used >= limits.typedChatsPerDay) {
+      return res.status(402).json({
+        error: `You've used your ${limits.typedChatsPerDay} tutor questions for today. They reset tomorrow.`,
+        reason: 'chat_limit',
+      });
+    }
+    await bumpTypedToday(auth.email, row);
   }
 
   if (!Array.isArray(messages) || !messages.length) {
@@ -562,7 +828,9 @@ app.post('/api/customize', async (req, res) => {
   // A full curriculum is the most expensive call in the app — signed in only
   const auth = await getAuthUser(req);
   if (!auth) return res.status(401).json({ error: 'Please sign in to build a plan.' });
-  if (overLimit(customizeHits, auth.email, 12, 3600_000)) {
+  const plan = planOf(await readUserRow(auth.email));
+  const limits = LIMITS[plan];
+  if (overLimit(customizeHits, auth.email, limits.customizePerHour, 3600_000)) {
     return res.status(429).json({ error: 'You have generated a lot of plans this hour — try again shortly.' });
   }
 
@@ -604,7 +872,7 @@ app.post('/api/customize', async (req, res) => {
 }
 
 Rules:
-- Create 4–5 units, each with 3–4 lessons
+- Create ${limits.units} units, each with 3–4 lessons
 - Each lesson has 5–8 word/phrase pairs
 - Phrases should be practical, full sentences or short phrases the learner will actually use
 - Tailor everything tightly to the learner's stated goal — no generic vocabulary

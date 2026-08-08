@@ -2923,3 +2923,127 @@ a.home-cta-btn { display: inline-block; text-decoration: none; }
 .crash-btn--ghost {
   background: none; border: 1px solid var(--border); color: var(--muted);
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   PLAN — Pro card on the profile, and the offline gate
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.plan-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.plan-card--pro {
+  border-color: var(--accent-border);
+  background: linear-gradient(180deg, var(--accent-soft), var(--surface));
+}
+
+.plan-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.plan-card-name { font-size: 16px; font-weight: 800; }
+
+.plan-card-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.plan-card-sub { font-size: 14px; color: var(--muted); margin: 0; line-height: 1.5; }
+
+.plan-perks {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.plan-perks li {
+  font-size: 14px;
+  padding-left: 22px;
+  position: relative;
+}
+
+.plan-perks li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.plan-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dark, var(--accent)));
+  color: var(--btn-text);
+  font-size: 15px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.plan-btn:disabled { opacity: 0.7; cursor: default; }
+
+.plan-btn--ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  margin-top: 12px;
+}
+
+.plan-card-note { font-size: 12px; color: var(--muted); text-align: center; margin: 10px 0 0; }
+.plan-card-error { font-size: 13px; color: var(--red, #ff4b4b); margin: 10px 0 0; }
+
+/* Offline gate */
+.offline-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.offline-gate-card {
+  max-width: 380px;
+  text-align: center;
+}
+
+.offline-gate-icon { font-size: 44px; margin-bottom: 12px; }
+.offline-gate-title { font-size: 22px; font-weight: 800; margin: 0 0 10px; }
+.offline-gate-sub { font-size: 15px; color: var(--muted); line-height: 1.6; margin: 0 0 20px; }
+
+.offline-gate-btn {
+  padding: 12px 22px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dark, var(--accent)));
+  color: var(--btn-text);
+  font-size: 15px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chat-header-hint--low { color: var(--accent-text); font-weight: 700; }
