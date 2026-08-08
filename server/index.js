@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
+import { promisify } from 'util';
 import pg from 'pg';
 
 const { Pool } = pg;
@@ -47,8 +48,101 @@ if (process.env.DATABASE_URL) {
 
 // ── Storage helpers ───────────────────────────────────────────────────────────
 
-function hash(password) {
+// ── Passwords and session tokens ─────────────────────────────────────────────
+//
+// Two problems this replaces:
+//
+//   1. Passwords were a single unsalted SHA-256 round with a constant suffix.
+//      SHA-256 is built to be fast, so a leaked table is a few GPU-hours away
+//      from being plaintext, and identical passwords produced identical hashes.
+//      Now: scrypt, per-user random salt.
+//
+//   2. The auth token *was* that hash. So a leaked table didn't even need
+//      cracking — every row was a working login — and there was no way to
+//      revoke a stolen token short of making the user change their password.
+//      Now: an HMAC-signed token that expires, and that stops verifying the
+//      moment the account's password changes.
+//
+// Both are backward compatible on purpose: existing rows verify and are
+// upgraded on the owner's next login, and tokens already sitting in people's
+// browsers keep working. See verifyPassword / getAuthUser below.
+
+const scryptAsync = promisify(crypto.scrypt);
+
+// N=16384 needs 128*N*r = 16 MB, which fits under Node's 32 MB scrypt default.
+const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
+
+// Signs tokens, and keeps the old SHA-256 hashes out of the database once an
+// account is upgraded (see stampLegacy). Setting TOKEN_SECRET in the
+// environment is strongly preferred; the fallback only exists so that a deploy
+// without it keeps working instead of logging everyone out. It has to be stable
+// across restarts, so it can't be random.
+const TOKEN_SECRET = process.env.TOKEN_SECRET || crypto.createHash('sha256')
+  .update('lumi-token-v1|' + (process.env.DATABASE_URL || process.env.ANTHROPIC_API_KEY || 'local-dev'))
+  .digest('hex');
+if (!process.env.TOKEN_SECRET) {
+  console.warn('TOKEN_SECRET is not set — falling back to a derived secret. Set it to a random 32+ byte value.');
+}
+
+const TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 90; // 90 days
+
+/** Constant-time compare for two hex strings of any length. */
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a), 'utf8');
+  const bb = Buffer.from(String(b), 'utf8');
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
+function hmac(data) {
+  return crypto.createHmac('sha256', TOKEN_SECRET).update(data).digest('hex');
+}
+
+/** The original scheme. Kept only to verify (and retire) pre-existing rows. */
+function legacyHash(password) {
   return crypto.createHash('sha256').update(password + 'linguo-salt').digest('hex');
+}
+
+/**
+ * Lets a token minted under the old scheme keep working after the account is
+ * upgraded, without leaving the crackable SHA-256 in the database — the stored
+ * value is keyed by TOKEN_SECRET, which lives in the environment.
+ */
+function stampLegacy(sha256Hex) {
+  return hmac('legacy|' + sha256Hex);
+}
+
+/** `s2$N$r$p$salt$key$legacyStamp` — the last field is empty for new accounts. */
+async function hashPassword(password, legacyStamp = '') {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const key = await scryptAsync(password, salt, SCRYPT.keylen, { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p });
+  return ['s2', SCRYPT.N, SCRYPT.r, SCRYPT.p, salt, key.toString('hex'), legacyStamp].join('$');
+}
+
+/** → { ok, needsUpgrade }. needsUpgrade means the row is still on SHA-256. */
+async function verifyPassword(password, stored) {
+  if (!stored) return { ok: false, needsUpgrade: false };
+  if (stored.startsWith('s2$')) {
+    const [, N, r, p, salt, key] = stored.split('$');
+    const derived = await scryptAsync(password, salt, key.length / 2, { N: +N, r: +r, p: +p });
+    return { ok: safeEqual(derived.toString('hex'), key), needsUpgrade: false };
+  }
+  return { ok: safeEqual(legacyHash(password), stored), needsUpgrade: true };
+}
+
+const b64url = s => Buffer.from(s, 'utf8').toString('base64url');
+
+/**
+ * Binding the signature to the stored password hash is what makes a password
+ * change (or reset) invalidate every token issued before it.
+ */
+function pwStamp(storedHash) {
+  return hmac('pw|' + storedHash).slice(0, 32);
+}
+
+function issueToken(email, storedHash) {
+  const payload = b64url(JSON.stringify({ e: email, iat: Date.now(), exp: Date.now() + TOKEN_TTL_MS }));
+  return `${payload}.${hmac(payload + '|' + pwStamp(storedHash))}`;
 }
 
 // Email is the account key, so it has to be compared case-insensitively.
@@ -76,31 +170,82 @@ function saveUsers(users) {
   writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
-// Resolve auth from Bearer token → { email, passwordHash } or null
+/**
+ * → { email, storedHash } or null. The email returned is always the spelling
+ * stored on the row, so callers can key off it directly.
+ */
+async function findUserByEmail(email) {
+  const target = normEmail(email);
+  if (pool) {
+    const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [target]);
+    const u = rows[0];
+    return u ? { email: u.email, storedHash: u.password_hash } : null;
+  }
+  const users = loadUsers();
+  const key = findUserKey(users, target);
+  return key ? { email: users[key].email ?? key, storedHash: users[key].passwordHash } : null;
+}
+
+// Resolve auth from a Bearer token → { email, storedHash } or null.
+//
+// Two formats are accepted. `payload.signature` is the current one. Anything
+// else is a token minted before the rewrite — base64("email:sha256hash") — and
+// is still honoured so that nobody is signed out by the upgrade. Base64 has no
+// '.' in its alphabet, so the two can't be confused.
 async function getAuthUser(req) {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return null;
   const token = auth.slice(7);
   try {
-    const decoded = Buffer.from(token, 'base64').toString('utf8');
-    const colonIdx = decoded.indexOf(':');
-    const email = decoded.slice(0, colonIdx);
-    const passwordHash = decoded.slice(colonIdx + 1);
-
-    if (pool) {
-      const { rows } = await pool.query(
-        'SELECT * FROM users WHERE email = $1', [email]
-      );
-      const user = rows[0];
-      if (!user || user.password_hash !== passwordHash) return null;
-      return { email, passwordHash };
-    } else {
-      const users = loadUsers();
-      const user = users[email];
-      if (!user || user.passwordHash !== passwordHash) return null;
-      return { email, passwordHash };
-    }
+    return token.includes('.') ? await verifySessionToken(token) : await verifyLegacyToken(token);
   } catch { return null; }
+}
+
+async function verifySessionToken(token) {
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig) return null;
+  const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  if (!claims?.e || !(claims.exp > Date.now())) return null;
+
+  const user = await findUserByEmail(claims.e);
+  if (!user) return null;
+  // Recomputed from the *current* password hash, so a password change or reset
+  // silently retires every token handed out before it.
+  if (!safeEqual(sig, hmac(payload + '|' + pwStamp(user.storedHash)))) return null;
+  return user;
+}
+
+async function verifyLegacyToken(token) {
+  const decoded = Buffer.from(token, 'base64').toString('utf8');
+  const colonIdx = decoded.indexOf(':');
+  if (colonIdx < 0) return null;
+  const presented = decoded.slice(colonIdx + 1);
+
+  const user = await findUserByEmail(decoded.slice(0, colonIdx));
+  if (!user?.storedHash) return null;
+
+  if (user.storedHash.startsWith('s2$')) {
+    // Already upgraded — the row keeps an HMAC of the retired hash so old
+    // tokens stay valid without the crackable original sitting in the table.
+    const stamp = user.storedHash.split('$')[6];
+    if (!stamp || !safeEqual(stamp, stampLegacy(presented))) return null;
+    return user;
+  }
+  if (!safeEqual(user.storedHash, presented)) return null;
+  return user;
+}
+
+/** Move a still-on-SHA-256 account to scrypt. Called after a successful login. */
+async function upgradeStoredHash(email, password, oldHash) {
+  const upgraded = await hashPassword(password, stampLegacy(oldHash));
+  if (pool) {
+    await pool.query('UPDATE users SET password_hash = $1 WHERE email = $2', [upgraded, email]);
+  } else {
+    const users = loadUsers();
+    const key = findUserKey(users, email);
+    if (key) { users[key].passwordHash = upgraded; saveUsers(users); }
+  }
+  return upgraded;
 }
 
 // ── App ──────────────────────────────────────────────────────────────────────
@@ -125,7 +270,7 @@ app.post('/api/auth/signup', async (req, res) => {
     return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters` });
   }
 
-  const ph = hash(password);
+  const ph = await hashPassword(password);
   const id = crypto.randomUUID();
   const createdAt = Date.now();
 
@@ -149,8 +294,7 @@ app.post('/api/auth/signup', async (req, res) => {
     saveUsers(users);
   }
 
-  const token = Buffer.from(`${email}:${ph}`).toString('base64');
-  res.json({ user: { id, name, email, createdAt }, token });
+  res.json({ user: { id, name, email, createdAt }, token: issueToken(email, ph) });
 });
 
 // Login
@@ -159,30 +303,35 @@ app.post('/api/auth/login', async (req, res) => {
   const email = normEmail(req.body.email);
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-  const ph = hash(password);
-
   if (pool) {
     const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [email]);
     const user = rows[0];
-    if (!user || user.password_hash !== ph) {
+    const check = await verifyPassword(password, user?.password_hash);
+    if (!user || !check.ok) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
-    // Build the token from the stored spelling, not what was typed
-    const token = Buffer.from(`${user.email}:${ph}`).toString('base64');
+    // A correct password is the only moment we can re-hash it, so take it.
+    const stored = check.needsUpgrade
+      ? await upgradeStoredHash(user.email, password, user.password_hash)
+      : user.password_hash;
     return res.json({
+      // The token is built from the stored spelling, not what was typed
       user: { id: user.id, name: user.name, email: user.email, createdAt: user.created_at },
-      token,
+      token: issueToken(user.email, stored),
     });
   } else {
     const users = loadUsers();
     const key = findUserKey(users, email);
     const user = key ? users[key] : null;
-    if (!user || user.passwordHash !== ph) {
+    const check = await verifyPassword(password, user?.passwordHash);
+    if (!user || !check.ok) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
-    const { passwordHash: _, ...safe } = user;
-    const token = Buffer.from(`${user.email}:${ph}`).toString('base64');
-    return res.json({ user: safe, token });
+    const stored = check.needsUpgrade
+      ? await upgradeStoredHash(user.email ?? key, password, user.passwordHash)
+      : user.passwordHash;
+    const { passwordHash: _, resetToken: __, resetTokenExpires: ___, ...safe } = user;
+    return res.json({ user: safe, token: issueToken(user.email ?? key, stored) });
   }
 });
 
@@ -231,7 +380,8 @@ app.get('/api/progress', async (req, res) => {
     return res.json(rows[0]?.progress ?? null);
   } else {
     const users = loadUsers();
-    return res.json(users[auth.email]?.progress ?? null);
+    const key = findUserKey(users, auth.email);
+    return res.json((key ? users[key].progress : null) ?? null);
   }
 });
 
@@ -246,7 +396,9 @@ app.post('/api/progress', async (req, res) => {
     );
   } else {
     const users = loadUsers();
-    users[auth.email].progress = req.body;
+    const key = findUserKey(users, auth.email);
+    if (!key) return res.status(401).json({ error: 'Unauthorized' });
+    users[key].progress = req.body;
     saveUsers(users);
   }
   res.json({ ok: true });
@@ -304,7 +456,8 @@ app.post('/api/auth/reset-password', async (req, res) => {
     return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters` });
   }
 
-  const newHash = hash(password);
+  // No legacy stamp: resetting a password should invalidate old sessions.
+  const newHash = await hashPassword(password);
 
   if (pool) {
     const { rows } = await pool.query(
@@ -321,9 +474,10 @@ app.post('/api/auth/reset-password', async (req, res) => {
     const users = loadUsers();
     const user = Object.values(users).find(u => u.resetToken === token && u.resetTokenExpires > Date.now());
     if (!user) return res.status(400).json({ error: 'Invalid or expired reset link' });
-    users[user.email].passwordHash = newHash;
-    users[user.email].resetToken = null;
-    users[user.email].resetTokenExpires = null;
+    const key = findUserKey(users, user.email);
+    users[key].passwordHash = newHash;
+    users[key].resetToken = null;
+    users[key].resetTokenExpires = null;
     saveUsers(users);
     return res.json({ ok: true });
   }

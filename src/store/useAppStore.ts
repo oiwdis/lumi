@@ -50,6 +50,20 @@ function flushSyncQueue() {
   postProgress(token, pending);
 }
 
+/**
+ * Sessions expire (and a password change ends them early), so a 401 means the
+ * token is dead, not that the request glitched. Retrying it forever would leave
+ * someone looking at a signed-in app whose progress silently stopped saving —
+ * so drop the session and show the login screen instead. Progress is already on
+ * disk under the user's own key, and merges back in on the next sign-in.
+ */
+function expireSession() {
+  if (!localStorage.getItem('lumi-token')) return;
+  localStorage.removeItem('lumi-token');
+  localStorage.removeItem(SYNC_QUEUE_KEY);
+  useAppStore.getState().logout();
+}
+
 // A rejected fetch is not the only way this fails — a 4xx/5xx resolves
 // normally, so check the status too or the snapshot is dropped silently.
 function postProgress(token: string, p: UserProgress) {
@@ -59,7 +73,10 @@ function postProgress(token: string, p: UserProgress) {
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify(p),
   })
-    .then(res => { if (!res.ok) requeue(); })
+    .then(res => {
+      if (res.status === 401) { expireSession(); return; }
+      if (!res.ok) requeue();
+    })
     .catch(requeue);
 }
 
@@ -251,7 +268,7 @@ export const useAppStore = create<AppStore>()(
           // Flush any queued offline progress first, then pull from server
           flushSyncQueue();
           fetch('/api/progress', { headers: { 'Authorization': `Bearer ${authToken}` } })
-            .then(r => r.ok ? r.json() : null)
+            .then(r => { if (r.status === 401) { expireSession(); return null; } return r.ok ? r.json() : null; })
             .then((serverProgress: UserProgress | null) => {
               if (!serverProgress) return;
               const current = useAppStore.getState();
@@ -270,7 +287,7 @@ export const useAppStore = create<AppStore>()(
         if (!token || !navigator.onLine) return;
         flushSyncQueue();
         fetch('/api/progress', { headers: { 'Authorization': `Bearer ${token}` } })
-          .then(r => r.ok ? r.json() : null)
+          .then(r => { if (r.status === 401) { expireSession(); return null; } return r.ok ? r.json() : null; })
           .then((serverProgress: UserProgress | null) => {
             if (!serverProgress) return;
             const current = useAppStore.getState();
