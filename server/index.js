@@ -711,28 +711,35 @@ Rules:
 - Assume a beginner
 - All target language text must be accurate ${language}`;
 
+  // Streamed, not awaited whole. This used to block on finalMessage(), so a
+  // visitor watched a spinner for the entire generation and saw nothing until
+  // the last character. Forwarding the deltas lets the page render each lesson
+  // as it is written — the first one lands about a third of the way in.
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
   try {
-    const response = await client.messages.stream({
+    const stream = client.messages.stream({
       model: 'claude-opus-4-8',
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: 'user', content: `Learner's goal: ${goal}` }],
-    }).finalMessage();
+    });
 
-    const text = response.content.find(b => b.type === 'text')?.text ?? '';
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start === -1 || end === -1) return res.status(500).json({ error: 'Could not build a preview. Try rephrasing your goal.' });
-    let unit;
-    try {
-      unit = JSON.parse(text.slice(start, end + 1));
-    } catch {
-      return res.status(500).json({ error: 'Could not build a preview. Try again.' });
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+      }
     }
-    if (!unit.lessons?.length) return res.status(500).json({ error: 'Could not build a preview. Try again.' });
-    res.json(unit);
+    res.write('data: [DONE]\n\n');
+    res.end();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Whatever upstream says goes to the log, not to the visitor — this endpoint
+    // is unauthenticated and the raw text carries request ids and key details.
+    console.error('preview-plan failed:', err.message);
+    res.write(`data: ${JSON.stringify({ error: 'Could not build a preview right now. Please try again.' })}\n\n`);
+    res.end();
   }
 });
 

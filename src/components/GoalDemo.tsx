@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CourseId } from '../types';
 import { LANDING_LANGS, GOAL_EXAMPLE, GOAL_HINT } from '../data/landingLangs';
+import { parsePartialJson } from '../lib/partialJson';
 
 /**
  * The curriculum generator, on the landing page, before signup. A visitor types
@@ -15,7 +16,8 @@ import { LANDING_LANGS, GOAL_EXAMPLE, GOAL_HINT } from '../data/landingLangs';
 interface PreviewLesson {
   title: string;
   emoji?: string;
-  words: Array<{ english: string; target: string; reading?: string }>;
+  // Optional: a lesson that is still streaming may not have reached its words yet
+  words?: Array<{ english: string; target: string; reading?: string }>;
 }
 interface PreviewUnit {
   title: string;
@@ -44,6 +46,7 @@ export default function GoalDemo({ defaultCourse, onGetStarted }: Props) {
   const [error, setError] = useState('');
   const [unit, setUnit] = useState<PreviewUnit | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Follow the hero when the visitor lands on /learn-japanese and friends
   useEffect(() => { setCourseId(defaultCourse); }, [defaultCourse]);
@@ -58,7 +61,15 @@ export default function GoalDemo({ defaultCourse, onGetStarted }: Props) {
   const lang = LANDING_LANGS.find(l => l.courseId === courseId)!;
 
   const handleGenerate = async () => {
-    if (!goal.trim() || loading) return;
+    if (loading) return;
+    // Validate on click rather than disabling the button. A greyed-out primary
+    // button is the first thing a visitor sees in this section, and it reads as
+    // broken rather than as "type something first".
+    if (!goal.trim()) {
+      setError('Tell Lumi what you need it for first — one specific sentence is enough.');
+      textareaRef.current?.focus();
+      return;
+    }
     setLoading(true);
     setError('');
     setUnit(null);
@@ -68,12 +79,51 @@ export default function GoalDemo({ defaultCourse, onGetStarted }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ courseId, language: lang.name, goal: goal.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Could not build your plan');
-      setUnit(data);
-      // Bring the result into view — on a phone it renders below the fold
-      window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+      // Rejections (rate limit, bad input) still answer with plain JSON; only a
+      // generation that actually started comes back as a stream.
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? 'Could not build your plan');
+      }
+
+      const reader = res.body!.getReader();
+      const dec = new TextDecoder();
+      let buf = '', acc = '', streamError = '', scrolled = false;
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6);
+          if (payload === '[DONE]') continue;
+          try {
+            const evt = JSON.parse(payload);
+            if (evt.error) { streamError = evt.error; continue; }
+            if (typeof evt.text === 'string') acc += evt.text;
+          } catch { /* a split frame — the next chunk completes it */ }
+        }
+        // Show the unit filling in rather than holding everything back
+        const partial = parsePartialJson<PreviewUnit>(acc);
+        if (partial?.lessons?.length) {
+          setUnit(partial);
+          if (!scrolled) {
+            scrolled = true;
+            // Bring the result into view — on a phone it renders below the fold
+            window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+          }
+        }
+      }
+
+      if (streamError) throw new Error(streamError);
+      const final = parsePartialJson<PreviewUnit>(acc);
+      if (!final?.lessons?.length) throw new Error('Could not build a preview. Try rephrasing your goal.');
+      setUnit(final);
     } catch (e: unknown) {
+      setUnit(null);
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
       setLoading(false);
@@ -116,12 +166,13 @@ export default function GoalDemo({ defaultCourse, onGetStarted }: Props) {
         <p className="gd-hint">{GOAL_HINT}</p>
         <textarea
           id="gd-goal"
+          ref={textareaRef}
           className="gd-textarea"
           rows={3}
           maxLength={300}
           placeholder={`e.g. “${GOAL_EXAMPLE[courseId]}”`}
           value={goal}
-          onChange={e => setGoal(e.target.value)}
+          onChange={e => { setGoal(e.target.value); if (error) setError(''); }}
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); }
           }}
@@ -131,7 +182,7 @@ export default function GoalDemo({ defaultCourse, onGetStarted }: Props) {
         <button
           className="gd-btn"
           onClick={handleGenerate}
-          disabled={!goal.trim() || loading}
+          disabled={loading}
         >
           {loading ? WAITING_LINES[waitIdx] : `Build my first ${lang.name} unit →`}
         </button>
@@ -151,14 +202,16 @@ export default function GoalDemo({ defaultCourse, onGetStarted }: Props) {
           </div>
 
           <div className="gd-lessons">
-            {unit.lessons.map((lesson, i) => (
+            {/* A lesson mid-stream has no title yet — showing the row early
+                flashes a bare placeholder emoji, so wait for the title. */}
+            {unit.lessons.filter(l => l.title).map((lesson, i) => (
               <div className="gd-lesson" key={i}>
                 <div className="gd-lesson-title">
                   <span className="gd-lesson-emoji">{lesson.emoji ?? '📘'}</span>
                   {lesson.title}
                 </div>
                 <ul className="gd-words">
-                  {lesson.words.map((w, j) => (
+                  {(lesson.words ?? []).map((w, j) => (
                     <li className="gd-word" key={j}>
                       <span className="gd-word-target">{w.target}</span>
                       {w.reading && <span className="gd-word-reading">{w.reading}</span>}
@@ -170,13 +223,13 @@ export default function GoalDemo({ defaultCourse, onGetStarted }: Props) {
             ))}
           </div>
 
-          <div className="gd-save">
+          {!loading && <div className="gd-save">
             <p className="gd-save-copy">
               That's unit 1 of {LANDING_LANGS.find(l => l.courseId === courseId)!.name}. Create a free
               account to save it and get the other four, plus the tutor.
             </p>
             <button className="gd-save-btn" onClick={handleSave}>Save this plan →</button>
-          </div>
+          </div>}
         </div>
       )}
     </section>
