@@ -3047,3 +3047,117 @@ a.home-cta-btn { display: inline-block; text-decoration: none; }
 }
 
 .chat-header-hint--low { color: var(--accent-text); font-weight: 700; }
+
+/* Pro offer — loud on purpose, it was previously the last thing on the screen */
+.plan-card--offer {
+  border: 1px solid var(--accent-border);
+  background:
+    radial-gradient(120% 100% at 0% 0%, var(--accent-soft), transparent 60%),
+    var(--surface);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+
+.plan-card--offer .plan-card-head { align-items: center; justify-content: flex-start; gap: 12px; }
+
+.plan-card-mark {
+  font-size: 20px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.plan-card--offer .plan-card-name { font-size: 17px; }
+.plan-card-price { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+.plan-card-per { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+/* Pro entry point on the course picker */
+.select-topbar-right { display: flex; align-items: center; gap: 8px; }
+
+.select-profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 12px 5px 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.select-profile-btn:hover { background: var(--overlay-md); }
+.select-profile-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.select-pro-chip {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.pro-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: calc(100% - 48px);
+  max-width: 640px;
+  margin: 0 auto 20px;
+  padding: 14px 18px;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text);
+  border: 1px solid var(--accent-border);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--accent-soft), transparent 65%),
+    var(--surface);
+  cursor: pointer;
+}
+
+.pro-banner:hover { border-color: var(--accent); }
+
+.pro-banner-mark {
+  font-size: 18px;
+  color: var(--accent);
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 11px;
+}
+
+.pro-banner-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pro-banner-title { font-size: 15px; font-weight: 800; }
+.pro-banner-sub { font-size: 12.5px; color: var(--muted); }
+.pro-banner-arrow { margin-left: auto; color: var(--accent); font-weight: 800; flex-shrink: 0; }
+
+@media (max-width: 420px) {
+  .select-profile-name { display: none; }
+  .pro-banner-sub { font-size: 12px; }
+}
+
+/* Profile on the left, controls on the right — the topbar was right-aligned
+   when it held nothing but a theme toggle and Logout. */
+.select-topbar {
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}

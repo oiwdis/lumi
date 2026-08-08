@@ -54,6 +54,54 @@ export default function ProfileScreen() {
       </div>
 
       <div className="profile-scroll">
+        {/* Plan sits above everything else. Buried under the hero and the XP
+            bar it was the last thing anyone saw on this screen. The upgrade
+            path is reachable only by the beta account — Stripe is on test keys,
+            so a real visitor who tried to pay would be declined and would
+            reasonably conclude the site is broken. */}
+        {account.betaAccess && account.plan !== 'pro' ? (
+          <div className="plan-card plan-card--offer">
+            <div className="plan-card-head">
+              <span className="plan-card-mark">✦</span>
+              <div>
+                <div className="plan-card-name">Lumi Pro</div>
+                <div className="plan-card-price">$8<span className="plan-card-per">/month</span></div>
+              </div>
+            </div>
+            <ul className="plan-perks">
+              <li>Unlimited tutor questions</li>
+              <li>10-unit courses instead of 5</li>
+              <li>Lessons keep working offline</li>
+              <li>Higher limits on everything AI</li>
+            </ul>
+            <button className="plan-btn" disabled={billingBusy} onClick={() => openBilling('/api/stripe/checkout')}>
+              {billingBusy ? 'Opening…' : 'Upgrade to Pro →'}
+            </button>
+            <p className="plan-card-note">Beta — test mode. No real card is charged.</p>
+            {billingError && <p className="plan-card-error">{billingError}</p>}
+          </div>
+        ) : (
+          <div className={`plan-card${account.plan === 'pro' ? ' plan-card--pro' : ''}`}>
+            <div className="plan-card-head">
+              <span className="plan-card-name">{account.plan === 'pro' ? '✦ Lumi Pro' : 'Free plan'}</span>
+              {account.plan === 'pro' && <span className="plan-card-badge">Active</span>}
+            </div>
+            <p className="plan-card-sub">
+              {account.plan === 'pro'
+                ? 'Unlimited tutor questions, 10-unit courses, offline lessons.'
+                : account.chatLimit === null
+                  ? 'Tutor questions are unlimited.'
+                  : `${Math.max(0, account.chatLimit - account.typedChatsToday)} of ${account.chatLimit} tutor questions left today.`}
+            </p>
+            {account.plan === 'pro' && (
+              <button className="plan-btn plan-btn--ghost" disabled={billingBusy} onClick={() => openBilling('/api/stripe/portal')}>
+                {billingBusy ? 'Opening…' : 'Manage billing'}
+              </button>
+            )}
+            {billingError && <p className="plan-card-error">{billingError}</p>}
+          </div>
+        )}
+
         {/* Hero card */}
         <div className="profile-hero" style={{ '--level-color': level.color } as React.CSSProperties}>
           <div className="profile-avatar-wrap">
@@ -80,48 +128,6 @@ export default function ProfileScreen() {
         </div>
 
         {/* Stats */}
-        {/* Plan. The upgrade button is only reachable by the beta account —
-            Stripe is on test keys, so a real visitor who tried to pay would be
-            declined and would reasonably conclude the site is broken. */}
-        <div className={`plan-card${account.plan === 'pro' ? ' plan-card--pro' : ''}`}>
-          <div className="plan-card-head">
-            <span className="plan-card-name">{account.plan === 'pro' ? '✦ Lumi Pro' : 'Free plan'}</span>
-            {account.plan === 'pro' && <span className="plan-card-badge">Active</span>}
-          </div>
-          {account.plan === 'pro' ? (
-            <p className="plan-card-sub">Unlimited tutor questions, 10-unit courses, offline lessons.</p>
-          ) : (
-            <p className="plan-card-sub">
-              {account.chatLimit === null
-                ? 'Tutor questions are unlimited.'
-                : `${Math.max(0, account.chatLimit - account.typedChatsToday)} of ${account.chatLimit} tutor questions left today.`}
-            </p>
-          )}
-
-          {account.betaAccess && account.plan !== 'pro' && (
-            <>
-              <ul className="plan-perks">
-                <li>Unlimited tutor questions</li>
-                <li>10-unit courses instead of 5</li>
-                <li>Lessons keep working offline</li>
-                <li>Higher limits on everything AI</li>
-              </ul>
-              <button className="plan-btn" disabled={billingBusy} onClick={() => openBilling('/api/stripe/checkout')}>
-                {billingBusy ? 'Opening…' : 'Upgrade to Pro — $8/mo'}
-              </button>
-              <p className="plan-card-note">Beta — test mode. No real card is charged.</p>
-            </>
-          )}
-
-          {account.plan === 'pro' && (
-            <button className="plan-btn plan-btn--ghost" disabled={billingBusy} onClick={() => openBilling('/api/stripe/portal')}>
-              {billingBusy ? 'Opening…' : 'Manage billing'}
-            </button>
-          )}
-
-          {billingError && <p className="plan-card-error">{billingError}</p>}
-        </div>
-
         <div className="profile-stats-grid">
           <div className="profile-stat">
             <div className="profile-stat-val">🔥{streak}</div>

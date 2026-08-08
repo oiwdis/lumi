@@ -1,21 +1,45 @@
 import { COURSES } from '../data';
 import { useAppStore } from '../store/useAppStore';
+import { getLevelForXp } from '../lib/levels';
 import type { CourseId } from '../types';
+import Avatar from './Avatar';
 
 export default function LanguageSelect() {
-  const { openOnboarding, setCourse, customGoal, logout, theme, toggleTheme } = useAppStore();
+  const { openOnboarding, setCourse, customGoal, logout, theme, toggleTheme,
+          openProfile, account, user, xp } = useAppStore();
+  const level = getLevelForXp(xp);
 
   return (
     <div className="select-screen">
       <div className="select-topbar">
-        <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '☀️' : '🌙'}</button>
-        <button className="select-logout-btn" onClick={logout}>Logout</button>
+        {/* The profile was previously only reachable from inside a lesson,
+            which is the one place you are least likely to go looking for it. */}
+        <button className="select-profile-btn" onClick={openProfile} title="Your profile">
+          <Avatar avatarId={level.avatarId} color={level.color} size={30} />
+          <span className="select-profile-name">{user?.name ?? 'Profile'}</span>
+          {account.plan === 'pro' && <span className="select-pro-chip">PRO</span>}
+        </button>
+        <div className="select-topbar-right">
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '☀️' : '🌙'}</button>
+          <button className="select-logout-btn" onClick={logout}>Logout</button>
+        </div>
       </div>
       <div className="select-hero">
         <span className="select-owl">🌱</span>
         <h1 className="select-title">Lumi</h1>
         <p className="select-sub">Your goals. Your lessons. Your language.</p>
       </div>
+
+      {account.betaAccess && account.plan !== 'pro' && (
+        <button className="pro-banner" onClick={openProfile}>
+          <span className="pro-banner-mark">✦</span>
+          <span className="pro-banner-text">
+            <strong className="pro-banner-title">Go Pro — $8/mo</strong>
+            <span className="pro-banner-sub">Unlimited tutor · 10-unit courses · offline lessons</span>
+          </span>
+          <span className="pro-banner-arrow">→</span>
+        </button>
+      )}
 
       <div className="select-label">Choose your course</div>
 
