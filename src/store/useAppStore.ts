@@ -221,6 +221,8 @@ interface AppStore {
   goalUpdatedAt: Record<string, number>;
   /** Billing state, owned by the server — never written from the client. */
   account: Account;
+  /** Where the profile was opened from, so its back button can return there. */
+  profileFrom: Screen | null;
 
   setScreen: (screen: Screen) => void;
   refreshPlan: () => void;
@@ -274,6 +276,7 @@ export const useAppStore = create<AppStore>()(
     (set, get) => ({
       screen: initialScreen(),
       account: FREE_ACCOUNT,
+      profileFrom: null,
       theme: (() => { try { return (localStorage.getItem('lumi-theme') as 'dark' | 'light') ?? 'dark'; } catch { return 'dark'; } })(),
       user: (() => {
         try { const u = localStorage.getItem('lumi-user'); return u ? JSON.parse(u) : null; } catch { return null; }
@@ -381,7 +384,7 @@ export const useAppStore = create<AppStore>()(
       },
 
       startLesson: (lessonId) => set({ currentLessonId: lessonId, screen: 'chat' }),
-      openProfile: () => set({ screen: 'profile' }),
+      openProfile: () => set({ profileFrom: get().screen, screen: 'profile' }),
 
       completeLesson: () => {
         const s = get();
@@ -415,11 +418,17 @@ export const useAppStore = create<AppStore>()(
       },
 
       goBack: () => {
-        const { screen } = get();
+        const { screen, profileFrom, selectedCourse } = get();
         if (screen === 'onboarding') set({ screen: 'select', selectedCourse: null });
         if (screen === 'path') set({ screen: 'select', selectedCourse: null });
         if (screen === 'chat') set({ screen: 'path', currentLessonId: null });
-        if (screen === 'profile') set({ screen: 'path' });
+        if (screen === 'profile') {
+          // This used to always return to the lesson path. Opened from the
+          // course picker there is no chosen course, so that rendered an empty
+          // default path instead of going back where you came from.
+          const fallback = selectedCourse ? 'path' : 'select';
+          set({ screen: profileFrom && profileFrom !== 'profile' ? profileFrom : fallback, profileFrom: null });
+        }
       },
 
       addXp: (amount) => {
@@ -448,7 +457,7 @@ export const useAppStore = create<AppStore>()(
         // `account` is deliberately not persisted. A stale 'pro' in localStorage
         // would light up the UI for someone whose subscription had lapsed; it is
         // re-fetched on every login and tab focus instead.
-        const { screen: _screen, account: _account, ...rest } = s;
+        const { screen: _screen, account: _account, profileFrom: _from, ...rest } = s;
         return rest;
       },
       // No onRehydrateStorage reset here. `screen` is partialized out, so the
