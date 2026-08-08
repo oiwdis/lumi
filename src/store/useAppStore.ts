@@ -383,9 +383,11 @@ export const useAppStore = create<AppStore>()(
         const { screen: _screen, ...rest } = s;
         return rest;
       },
-      onRehydrateStorage: () => () => {
-        useAppStore.setState({ screen: initialScreen() });
-      },
+      // No onRehydrateStorage reset here. `screen` is partialized out, so the
+      // shallow merge already leaves the value the store started with — and
+      // re-deriving it after hydration overwrote whatever the router had just
+      // resolved from the URL, which is why opening /signup while signed out
+      // bounced to /login and lost the Sign up tab.
     }
   )
 );

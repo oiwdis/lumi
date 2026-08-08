@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from './store/useAppStore';
 import type { CourseId } from './types';
@@ -37,6 +37,10 @@ const PATH_TO_SCREEN: Record<string, Screen> = {
   // Per-language landing pages are the home screen with a language-specific hero
   ...Object.fromEntries(LANDING_LANGS.map(l => [`/${l.slug}`, 'home' as Screen])),
 };
+
+// Screens nobody should land on without an account. Reaching one of these from
+// the URL (a deep link, or Back after logging out) falls back to the landing page.
+const PROTECTED: Screen[] = ['select', 'onboarding', 'path', 'chat', 'profile'];
 
 export default function App() {
   const screen = useAppStore(s => s.screen);
@@ -85,48 +89,57 @@ export default function App() {
     };
   }, []);
 
-  // On mount: if URL has a known path, set the store screen to match
-  // Screens nobody should land on without an account. Reaching one of these from
-  // the URL (a deep link, or Back after logging out) falls back to the landing page.
-  const PROTECTED: Screen[] = ['select', 'onboarding', 'path', 'chat', 'profile'];
+  // What the effect below saw last time it ran, so it can tell which side moved.
+  // These are values it *observed*, not ones it intended — recording intent would
+  // misread StrictMode's double-invoke (same render, same state) as a real change.
+  const seen = useRef<{ path: string; screen: Screen } | null>(null);
 
-  // Follow the URL into the store. This runs on mount for deep links, and again on
-  // every Back/Forward, which is what makes the browser's back button walk through
-  // the app instead of leaving it.
+  // URL and store screen, kept in step. This was two effects — one each way —
+  // and because each was missing the other's value from its dependency array,
+  // they could disagree and then correct each other forever: opening /login or
+  // /signup while already signed in put the app in an infinite navigate loop
+  // and dropped it on the error screen. One effect that owns both directions
+  // can't race itself.
   useEffect(() => {
-    const mapped = PATH_TO_SCREEN[location.pathname];
-    if (!mapped || mapped === screen) return;
-    // These rewrite the URL themselves rather than relying on the screen effect:
-    // if the screen is already what we're falling back to, setScreen is a no-op
-    // and the address bar would keep showing the rejected path.
-    if (PROTECTED.includes(mapped) && !user) {
-      setScreen('home');
-      navigate('/', { replace: true });
+    const path = location.pathname;
+    const mapped = PATH_TO_SCREEN[path];
+    const prev = seen.current;
+    seen.current = { path, screen };
+    if (prev && prev.path === path && prev.screen === screen) return;
+
+    // On the first run both sides are "new", and the URL is the one the user
+    // actually asked for — so a deep link wins over the store's default screen.
+    const urlMoved = !prev || prev.path !== path;
+
+    if (urlMoved && mapped) {
+      // These rewrite the URL themselves: if the screen is already what we're
+      // falling back to, setScreen is a no-op and the address bar would keep
+      // showing the rejected path.
+      if (PROTECTED.includes(mapped) && !user) {
+        setScreen('home');
+        navigate('/', { replace: true });
+        return;
+      }
+      // /lesson is meaningless without a chosen lesson — back to the path
+      if (mapped === 'chat' && !currentLessonId) {
+        setScreen('path');
+        navigate('/path', { replace: true });
+        return;
+      }
+      if (mapped !== screen) setScreen(mapped);
       return;
     }
-    // /lesson is meaningless without a chosen lesson — send them back to the path
-    if (mapped === 'chat' && !currentLessonId) {
-      setScreen('path');
-      navigate('/path', { replace: true });
-      return;
-    }
-    setScreen(mapped);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
 
-  // Whenever screen changes in store, update the URL. A path that already maps to
-  // the current screen is left alone, so deep links like /learn-japanese survive
-  // instead of being rewritten to '/'.
-  //
-  // This pushes rather than replaces: with replace, the whole app occupied a single
-  // history entry, so pressing Back from any screen left the site entirely instead
-  // of going to the previous screen.
-  useEffect(() => {
+    // The store moved, so bring the URL along. A path that already maps to the
+    // current screen is left alone, so deep links like /learn-japanese survive
+    // instead of being rewritten to '/'.
+    //
+    // This pushes rather than replaces: with replace, the whole app occupied a
+    // single history entry, so pressing Back from any screen left the site
+    // entirely instead of going to the previous screen.
     const targetPath = SCREEN_TO_PATH[screen];
-    if (targetPath && PATH_TO_SCREEN[location.pathname] !== screen) {
-      navigate(targetPath);
-    }
-  }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (targetPath && mapped !== screen) navigate(targetPath);
+  }, [location.pathname, screen, user, currentLessonId, setScreen, navigate]);
 
   // Someone who generated a plan on the landing page shouldn't retype their goal
   useEffect(() => {
