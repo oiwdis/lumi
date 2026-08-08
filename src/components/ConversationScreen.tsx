@@ -388,7 +388,11 @@ export default function ConversationScreen() {
 
   const [screen, setScreen] = useState<'lesson' | 'quiz' | 'results' | 'unit-quiz' | 'unit-results'>('lesson');
   const [quiz, setQuiz] = useState<QuizState | null>(null);
-  const [quizScore, setQuizScore] = useState(0);
+  // Score *and* the number of questions it was out of. The denominator used to be
+  // hard-coded to 5, but the quiz has one question per word in the lesson, and an
+  // AI-generated lesson carries 5–8 — which is how the results screen ended up
+  // showing things like "7/5".
+  const [quizResult, setQuizResult] = useState<{ score: number; total: number } | null>(null);
   const [unitQuiz, setUnitQuiz] = useState<QuizState | null>(null);
   const [unitQuizScore, setUnitQuizScore] = useState(0);
   const [topic, setTopic] = useState<Topic | null>(null);
@@ -454,6 +458,7 @@ export default function ConversationScreen() {
     setTopic(t);
     setLs(initExercise(state));
     setChatMessages([]);
+    setQuizResult(null);
     setScreen('lesson');
   }, [allWords, langName, sortBySrs]);
 
@@ -509,7 +514,7 @@ export default function ConversationScreen() {
       if (topic) {
         const q = buildQuiz(topic, allWords);
         setQuiz(q);
-        setQuizScore(0);
+        setQuizResult(null);
         setScreen('quiz');
       } else {
         setScreen('results');
@@ -577,7 +582,7 @@ export default function ConversationScreen() {
     if (!quiz) return;
     const isLast = quiz.idx >= quiz.questions.length - 1;
     if (isLast) {
-      setQuizScore(quiz.score);
+      setQuizResult({ score: quiz.score, total: quiz.questions.length });
       setScreen('results');
       return;
     }
@@ -1050,9 +1055,12 @@ export default function ConversationScreen() {
 
   // RESULTS
   if (screen === 'results') {
-    const totalEx = ls ? ls.exercises.filter(e => e.kind !== 'pairs').length : 1;
+    // Only the graded exercises. Filtering out just 'pairs' left the flashcard
+    // intro in the denominator even though it can't be answered, so a perfect
+    // lesson still read one short of full marks and never hit 100%.
+    const totalEx = ls ? ls.exercises.filter(e => e.kind === 'mc' || e.kind === 'type').length : 0;
     const score = ls ? ls.score : 0;
-    const pct100 = Math.round((score / totalEx) * 100);
+    const pct100 = totalEx > 0 ? Math.round((score / totalEx) * 100) : 0;
     return (
       <div className="conv-screen">
         <TopBar onBack={completeLesson} />
@@ -1061,7 +1069,9 @@ export default function ConversationScreen() {
           <h2 className="dl-results-title">Lesson complete!</h2>
           <div className="dl-results-stats">
             <div className="dl-stat"><span className="dl-stat-num">{score}/{totalEx}</span><span className="dl-stat-lbl">Lesson</span></div>
-            <div className="dl-stat"><span className="dl-stat-num">{quizScore}/5</span><span className="dl-stat-lbl">🎯 Quiz</span></div>
+            {quizResult && (
+              <div className="dl-stat"><span className="dl-stat-num">{quizResult.score}/{quizResult.total}</span><span className="dl-stat-lbl">🎯 Quiz</span></div>
+            )}
           </div>
           {topic && (
             <div className="dl-words-review">
